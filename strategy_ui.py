@@ -859,7 +859,7 @@ def delete_file(filename):
 
 @app.route('/api/extract-python-parameters', methods=['POST'])
 def extract_python_parameters():
-    """Extract parameters from Python strategy code"""
+    """Extract parameters and metadata from Python strategy code"""
     try:
         data = request.json
         python_code = data.get('python_code')
@@ -867,10 +867,11 @@ def extract_python_parameters():
         if not python_code:
             return jsonify({'error': 'Missing Python code'}), 400
 
-        # Extract DEFAULT_PARAMS from code
+        # Extract DEFAULT_PARAMS and PARAMETER_METADATA from code
         import re
 
         parameters = {}
+        metadata = {}
 
         # Create namespace and execute code to get variable definitions
         namespace = {}
@@ -878,6 +879,8 @@ def extract_python_parameters():
             exec(python_code, namespace)
             if 'DEFAULT_PARAMS' in namespace:
                 parameters = namespace['DEFAULT_PARAMS'].copy()
+            if 'PARAMETER_METADATA' in namespace:
+                metadata = namespace['PARAMETER_METADATA'].copy()
         except:
             pass
 
@@ -919,6 +922,7 @@ def extract_python_parameters():
             json.dumps({
                 'success': True,
                 'parameters': parameters,
+                'metadata': metadata,
                 'count': len(parameters)
             }, sort_keys=False, cls=NaNEncoder),
             mimetype='application/json'
@@ -1170,8 +1174,8 @@ def bruteforce_test():
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
-def generate_parameter_combinations(parameter_configs):
-    """Generate all parameter combinations from config"""
+def generate_parameter_combinations(parameter_configs, parameter_metadata=None):
+    """Generate all parameter combinations from config with support for decimal steps"""
     import itertools
 
     param_lists = {}
@@ -1185,11 +1189,23 @@ def generate_parameter_combinations(parameter_configs):
             continue
 
         if isinstance(from_val, (int, float)) and isinstance(to_val, (int, float)):
-            # Generate range of values
-            if isinstance(from_val, int) and isinstance(to_val, int):
-                param_lists[param_name] = list(range(int(from_val), int(to_val) + 1))
+            # Check if metadata specifies a step
+            step = 1
+            if parameter_metadata and param_name in parameter_metadata:
+                step = parameter_metadata[param_name].get('step', 1)
+
+            # Generate range of values with proper step
+            if step == int(step) and isinstance(from_val, int) and isinstance(to_val, int):
+                # Integer range
+                param_lists[param_name] = list(range(int(from_val), int(to_val) + 1, int(step)))
             else:
-                param_lists[param_name] = [from_val, to_val]  # For now, just test from and to
+                # Decimal range - generate with step
+                values = []
+                current = float(from_val)
+                while current <= float(to_val) + 1e-9:  # Small epsilon for floating point
+                    values.append(round(current, 10))  # Round to avoid float precision issues
+                    current += float(step)
+                param_lists[param_name] = values
         else:
             param_lists[param_name] = [from_val, to_val]
 
