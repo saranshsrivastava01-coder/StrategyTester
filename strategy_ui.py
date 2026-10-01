@@ -937,6 +937,7 @@ def calculate_combinations():
     try:
         data = request.json
         parameter_configs = data.get('parameter_configs', {})
+        parameter_metadata = data.get('parameter_metadata', {})
 
         # Ensure Freedom filter is included
         if 'useFreedomFilter' not in parameter_configs:
@@ -947,7 +948,7 @@ def calculate_combinations():
             }
 
         # Generate combinations to count them
-        combinations = generate_parameter_combinations(parameter_configs)
+        combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
 
         return jsonify({
             'total_combinations': len(combinations),
@@ -1047,14 +1048,17 @@ def bruteforce_test():
 
         # Execute code to get namespace with constants (for resolving parameter values)
         namespace = {}
+        parameter_metadata = {}
         try:
             exec(python_code, namespace)
+            if 'PARAMETER_METADATA' in namespace:
+                parameter_metadata = namespace['PARAMETER_METADATA']
         except:
             pass
 
         # Generate parameter combinations
         results = []
-        combinations = generate_parameter_combinations(parameter_configs)
+        combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
 
         # Initialize progress tracking
         global bruteforce_progress
