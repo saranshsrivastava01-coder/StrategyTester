@@ -843,5 +843,62 @@ def delete_file(filename):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/extract-python-parameters', methods=['POST'])
+def extract_python_parameters():
+    """Extract parameters from Python strategy code"""
+    try:
+        data = request.json
+        python_code = data.get('python_code')
+
+        if not python_code:
+            return jsonify({'error': 'Missing Python code'}), 400
+
+        # Extract DEFAULT_PARAMS or similar dictionary from the code
+        import re
+
+        parameters = {}
+
+        # Look for DEFAULT_PARAMS = { ... }
+        default_params_match = re.search(r'DEFAULT_PARAMS\s*=\s*\{(.*?)\n\s*\}', python_code, re.DOTALL)
+        if default_params_match:
+            params_text = default_params_match.group(1)
+
+            # Extract each parameter
+            param_pattern = r"'(\w+)':\s*([^,]+)"
+            matches = re.findall(param_pattern, params_text)
+
+            for param_name, param_value in matches:
+                param_value = param_value.strip()
+
+                # Try to evaluate the value
+                try:
+                    if param_value.startswith("'") or param_value.startswith('"'):
+                        # String value
+                        parameters[param_name] = param_value.strip("'\"")
+                    elif param_value.lower() == 'true':
+                        parameters[param_name] = True
+                    elif param_value.lower() == 'false':
+                        parameters[param_name] = False
+                    else:
+                        # Try to convert to number
+                        if '.' in param_value or 'e' in param_value.lower():
+                            parameters[param_name] = float(param_value)
+                        else:
+                            parameters[param_name] = int(param_value)
+                except:
+                    parameters[param_name] = param_value
+
+        return Response(
+            json.dumps({
+                'success': True,
+                'parameters': parameters,
+                'count': len(parameters)
+            }, sort_keys=False, cls=NaNEncoder),
+            mimetype='application/json'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001, host='localhost')
