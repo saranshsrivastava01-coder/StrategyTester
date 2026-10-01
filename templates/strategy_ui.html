@@ -1459,16 +1459,41 @@
             }
         }
 
-        function runBruteForceTest() {
+        async function runBruteForceTest() {
             if (!bruteForcePythonScript || !bruteForceOHLCData) {
                 alert('Please upload both Python strategy and OHLC data');
                 return;
             }
 
-            const resultsContainer = document.getElementById('bruteforce-results');
-            resultsContainer.innerHTML = '<p style="color: var(--text-secondary);">🔄 Running brute force test... This may take a while</p>';
+            // First, calculate total combinations
+            const paramConfigs = collectParameterConfigs();
 
-            // Collect parameter configurations
+            try {
+                const calcResp = await fetch('/api/calculate-combinations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ parameter_configs: paramConfigs })
+                });
+
+                const calcData = await calcResp.json();
+                const totalCombos = calcData.total_combinations;
+
+                // Show confirmation dialog
+                const confirmed = confirm(`⚠️ This will test ${totalCombos.toLocaleString()} combinations.\n\nClick OK to start execution.`);
+
+                if (!confirmed) {
+                    return;
+                }
+
+                // Start the actual test
+                startBruteForceTest(paramConfigs);
+
+            } catch (err) {
+                alert('Error calculating combinations: ' + err.message);
+            }
+        }
+
+        function collectParameterConfigs() {
             const paramConfigs = {};
             Object.keys(bruteForceParameters).forEach(paramName => {
                 const idx = bruteForceParameters[paramName].index;
@@ -1511,6 +1536,12 @@
                     };
                 }
             });
+            return paramConfigs;
+        }
+
+        function startBruteForceTest(paramConfigs) {
+            const resultsContainer = document.getElementById('bruteforce-results');
+            resultsContainer.innerHTML = '<div style="padding: 20px;"><p style="color: var(--text-secondary); font-size: 1.1em; margin-bottom: 15px;">🔄 Test Running...</p><div id="progress-monitor" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; font-size: 0.9em; line-height: 1.8; font-family: monospace; color: var(--text-primary);"><p>Initializing test...</p></div></div>';
 
             // Send to backend
             const requestData = {
@@ -1519,6 +1550,29 @@
                 parameter_configs: paramConfigs
             };
 
+            const startTime = Date.now();
+
+            // Start progress monitoring
+            let progressInterval = setInterval(async () => {
+                try {
+                    const progResp = await fetch('/api/bruteforce-progress');
+                    const progData = await progResp.json();
+
+                    const elapsed = Math.round((Date.now() - startTime) / 1000);
+                    const progressHTML = `
+                        <p>⏱️ <strong>Elapsed:</strong> ${elapsed}s</p>
+                        <p>📊 <strong>Completed:</strong> ${progData.completed.toLocaleString()} / ${progData.total.toLocaleString()} (${progData.percentage}%)</p>
+                        <p>❌ <strong>Errors:</strong> ${progData.errors}</p>
+                        <p>📈 <strong>Remaining:</strong> ${progData.remaining.toLocaleString()}</p>
+                        <p>⚡ <strong>Rate:</strong> ${progData.rate} combinations/sec</p>
+                        <p>🕐 <strong>ETA:</strong> ~${progData.eta_seconds}s (${Math.round(progData.eta_seconds / 60)} min)</p>
+                    `;
+                    document.getElementById('progress-monitor').innerHTML = progressHTML;
+                } catch (err) {
+                    // Progress endpoint not ready yet
+                }
+            }, 1000);
+
             fetch('/api/bruteforce-test', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1526,6 +1580,7 @@
             })
             .then(resp => resp.json())
             .then(data => {
+                clearInterval(progressInterval);
                 if (data.error) {
                     resultsContainer.innerHTML = `<p style="color: #ef4444;">❌ Error: ${data.error}</p>`;
                 } else {
@@ -1533,6 +1588,7 @@
                 }
             })
             .catch(err => {
+                clearInterval(progressInterval);
                 resultsContainer.innerHTML = `<p style="color: #ef4444;">❌ Error: ${err.message}</p>`;
             });
         }

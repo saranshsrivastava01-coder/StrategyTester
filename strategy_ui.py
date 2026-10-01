@@ -9,6 +9,7 @@ from pine_script_converter import PineScriptParser, PineScriptValidator
 from strategy_optimizer import StrategyOptimizer
 import traceback
 import openpyxl
+import time
 
 # Custom JSON encoder to handle NaN and inf values
 class NaNEncoder(json.JSONEncoder):
@@ -926,6 +927,64 @@ def extract_python_parameters():
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
+@app.route('/api/calculate-combinations', methods=['POST'])
+def calculate_combinations():
+    """Calculate total combinations without running the test"""
+    try:
+        data = request.json
+        parameter_configs = data.get('parameter_configs', {})
+
+        # Ensure Freedom filter is included
+        if 'useFreedomFilter' not in parameter_configs:
+            parameter_configs['useFreedomFilter'] = {
+                'from': False,
+                'to': False,
+                'default': False
+            }
+
+        # Generate combinations to count them
+        combinations = generate_parameter_combinations(parameter_configs)
+
+        return jsonify({
+            'total_combinations': len(combinations),
+            'parameters_count': len(parameter_configs)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
+# Global progress tracking
+bruteforce_progress = {
+    'total': 0,
+    'completed': 0,
+    'errors': 0,
+    'start_time': None,
+    'is_running': False
+}
+
+@app.route('/api/bruteforce-progress', methods=['GET'])
+def get_bruteforce_progress():
+    """Get current progress of brute force test"""
+    if not bruteforce_progress['is_running']:
+        return jsonify({'error': 'No test running'}), 400
+
+    elapsed = time.time() - bruteforce_progress['start_time'] if bruteforce_progress['start_time'] else 0
+    remaining = bruteforce_progress['total'] - bruteforce_progress['completed']
+    rate = bruteforce_progress['completed'] / elapsed if elapsed > 0 else 0
+    eta = remaining / rate if rate > 0 else 0
+
+    return jsonify({
+        'total': bruteforce_progress['total'],
+        'completed': bruteforce_progress['completed'],
+        'errors': bruteforce_progress['errors'],
+        'remaining': remaining,
+        'elapsed_seconds': int(elapsed),
+        'eta_seconds': int(eta),
+        'percentage': int((bruteforce_progress['completed'] / bruteforce_progress['total'] * 100)) if bruteforce_progress['total'] > 0 else 0,
+        'rate': round(rate, 2)
+    })
+
+
 @app.route('/api/bruteforce-test', methods=['POST'])
 def bruteforce_test():
     """Run brute force parameter optimization"""
@@ -992,6 +1051,16 @@ def bruteforce_test():
         # Generate parameter combinations
         results = []
         combinations = generate_parameter_combinations(parameter_configs)
+
+        # Initialize progress tracking
+        global bruteforce_progress
+        bruteforce_progress = {
+            'total': len(combinations),
+            'completed': 0,
+            'errors': 0,
+            'start_time': time.time(),
+            'is_running': True
+        }
 
         for combo in combinations:
             try:
@@ -1075,11 +1144,17 @@ def bruteforce_test():
                     'profit_factor': profit_factor,
                     'monthly_stats': monthly_stats
                 })
+                bruteforce_progress['completed'] += 1
             except Exception as e:
                 # Log error but continue with other combinations
+                bruteforce_progress['completed'] += 1
+                bruteforce_progress['errors'] += 1
                 print(f"❌ Failed combination {combo}: {str(e)}", flush=True)
                 import traceback
                 traceback.print_exc()
+
+        # Mark test as complete
+        bruteforce_progress['is_running'] = False
 
         # If no results, return error with context
         if not results:
@@ -1091,6 +1166,7 @@ def bruteforce_test():
         )
 
     except Exception as e:
+        bruteforce_progress['is_running'] = False
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
