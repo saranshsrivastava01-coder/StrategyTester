@@ -379,26 +379,26 @@
         <!-- LEFT COLUMN: PINE SCRIPT + EXCEL (Side by Side) -->
         <div class="column left-column">
             <!-- Upload Tiles Row -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; align-items: start;">
                 <!-- Pine Script Tile -->
-                <div class="panel">
+                <div class="panel" style="min-height: 280px; display: flex; flex-direction: column;">
                     <h2>📄 Pine Script</h2>
                     <div class="form-group">
                         <label>Upload .pine file:</label>
                         <input type="file" id="pine-file" accept=".pine,.txt,.pinescript">
                     </div>
-                    <button onclick="uploadPineScript()" style="width: 100%;">Upload</button>
+                    <button onclick="uploadPineScript()" style="width: 100%; margin-top: auto;">Upload</button>
                     <div id="pine-status" class="status-message"></div>
                 </div>
 
                 <!-- Output Excel Tile -->
-                <div class="panel">
+                <div class="panel" style="min-height: 280px; display: flex; flex-direction: column;">
                     <h2>📊 Output Excel</h2>
                     <div class="form-group">
                         <label>Upload .xlsx file:</label>
                         <input type="file" id="excel-file" accept=".xlsx">
                     </div>
-                    <button onclick="uploadExcelFile()" style="width: 100%;">Upload & Analyze</button>
+                    <button onclick="uploadExcelFile()" style="width: 100%; margin-top: auto;">Upload & Analyze</button>
                     <div id="excel-status" class="status-message"></div>
                 </div>
             </div>
@@ -413,37 +413,37 @@
         <!-- RIGHT COLUMN: PYTHON + EXCEL + OHLC (Side by Side) -->
         <div class="column right-column">
             <!-- Upload Tiles Row (3 Columns) -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; align-items: start;">
                 <!-- Python Strategy Tile -->
-                <div class="panel">
+                <div class="panel" style="min-height: 280px; display: flex; flex-direction: column;">
                     <h2>🐍 Python Strategy</h2>
                     <div class="form-group">
                         <label>Upload .py file:</label>
                         <input type="file" id="python-file" accept=".py">
                     </div>
-                    <button onclick="uploadPythonFile()" style="width: 100%;">Upload</button>
+                    <button onclick="uploadPythonFile()" style="width: 100%; margin-top: auto;">Upload</button>
                     <div id="python-status" class="status-message"></div>
                 </div>
 
                 <!-- Excel (for parameters) Tile -->
-                <div class="panel">
+                <div class="panel" style="min-height: 280px; display: flex; flex-direction: column;">
                     <h2>📊 Excel (for parameters)</h2>
                     <div class="form-group">
                         <label>Upload .xlsx file:</label>
                         <input type="file" id="python-excel-file" accept=".xlsx">
                     </div>
-                    <button onclick="uploadPythonExcelFile()" style="width: 100%;">Upload & Extract</button>
+                    <button onclick="uploadPythonExcelFile()" style="width: 100%; margin-top: auto;">Upload & Extract</button>
                     <div id="python-excel-status" class="status-message"></div>
                 </div>
 
                 <!-- OHLC Data Tile -->
-                <div class="panel">
+                <div class="panel" style="min-height: 280px; display: flex; flex-direction: column;">
                     <h2>📈 OHLC Data</h2>
                     <div class="form-group">
                         <label>Upload CSV file:</label>
                         <input type="file" id="ohlc-file" accept=".csv">
                     </div>
-                    <button onclick="uploadOHLCFile()" style="width: 100%;">Upload</button>
+                    <button onclick="uploadOHLCFile()" style="width: 100%; margin-top: auto;">Upload</button>
                     <button onclick="runPythonBacktest()" style="margin-top: 10px; width: 100%;">Run Backtest</button>
                     <div id="ohlc-status" class="status-message"></div>
                 </div>
