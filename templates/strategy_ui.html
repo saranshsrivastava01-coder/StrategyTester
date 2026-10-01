@@ -472,30 +472,11 @@
             </div>
         </div>
 
-        <!-- Summary Stats -->
+        <!-- Summary Stats - All 10 KPIs -->
         <div class="panel" style="margin-bottom: 20px;">
-            <h2>📊 Performance Summary</h2>
-            <div id="tester-summary" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px;">
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Total Trades</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: var(--accent-color);">-</div>
-                </div>
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Win Rate</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: var(--success-color);">-</div>
-                </div>
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Total PnL</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: var(--accent-color);">-</div>
-                </div>
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Max Drawdown</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: #ef4444;">-</div>
-                </div>
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Profit Factor</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: var(--accent-color);">-</div>
-                </div>
+            <h2>📊 Performance Summary - All 10 KPIs</h2>
+            <div id="tester-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-top: 15px;">
+                <!-- KPIs will be populated here -->
             </div>
         </div>
 
@@ -993,32 +974,33 @@
         }
 
         function displayTesterResults(data) {
-            // Update summary stats
+            // Update summary stats - All 10 KPIs
             const summary = document.getElementById('tester-summary');
             const kpis = data.kpis || {};
 
-            summary.innerHTML = `
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Total Trades</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: var(--accent-color);">${kpis.total_trades?.calculated || 0}</div>
-                </div>
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Win Rate</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: var(--success-color);">${kpis.win_rate?.calculated || 0}%</div>
-                </div>
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Total PnL</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: var(--accent-color);">${kpis.total_pnl?.calculated || 0}</div>
-                </div>
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Max Drawdown</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: #ef4444;">${kpis.max_drawdown_cc?.calculated || 0}</div>
-                </div>
-                <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--text-secondary); font-size: 0.9em;">Profit Factor</div>
-                    <div style="font-size: 1.8em; font-weight: bold; color: var(--accent-color);">${kpis.profit_factor?.calculated || 0}</div>
-                </div>
-            `;
+            const kpiList = [
+                { key: 'total_trades', label: 'Total Trades', color: 'var(--accent-color)' },
+                { key: 'winning_trades', label: 'Winning Trades', color: 'var(--success-color)' },
+                { key: 'losing_trades', label: 'Losing Trades', color: '#ef4444' },
+                { key: 'win_rate', label: 'Win Rate %', color: 'var(--success-color)' },
+                { key: 'max_profit', label: 'Max Profit', color: 'var(--success-color)' },
+                { key: 'max_loss', label: 'Max Loss', color: '#ef4444' },
+                { key: 'total_pnl', label: 'Total PnL', color: 'var(--accent-color)' },
+                { key: 'max_drawdown_cc', label: 'Max DD (C-C)', color: '#ef4444' },
+                { key: 'max_drawdown_intrabar', label: 'Max DD (Intra)', color: '#ef4444' },
+                { key: 'profit_factor', label: 'Profit Factor', color: 'var(--accent-color)' }
+            ];
+
+            let html = '';
+            for (const item of kpiList) {
+                const value = kpis[item.key]?.calculated ?? 0;
+                const displayValue = typeof value === 'number' ? value.toFixed(2) : value;
+                html += `<div style="padding: 12px; background: var(--table-hover); border-radius: 8px; border-left: 3px solid ${item.color}; text-align: center;">
+                    <div style="color: var(--text-secondary); font-size: 0.8em; margin-bottom: 5px;">${item.label}</div>
+                    <div style="font-size: 1.5em; font-weight: bold; color: ${item.color};">${displayValue}</div>
+                </div>`;
+            }
+            summary.innerHTML = html;
 
             // Display trades table
             displayTesterTrades(data);
