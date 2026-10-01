@@ -1657,15 +1657,20 @@
             results.sort((a, b) => b.total_pnl - a.total_pnl);
 
             let html = `
-            <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-                <p style="color: var(--text-secondary);">✅ Completed ${results.length} combinations</p>
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="downloadBruteForceResults('csv')" style="padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
-                        📥 Download CSV
-                    </button>
-                    <button onclick="downloadBruteForceResults('xlsx')" style="padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
-                        📥 Download XLSX
-                    </button>
+            <div style="margin-bottom: 20px; background: var(--bg-secondary); padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div>
+                        <p style="color: var(--text-primary); margin: 0 0 5px 0; font-size: 1.1em; font-weight: bold;">✅ Test Complete!</p>
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.95em;">Completed ${results.length} combination${results.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <button onclick="downloadBruteForceResults('csv')" style="padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1em; font-weight: bold; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3); transition: all 0.2s;">
+                            📊 Export CSV
+                        </button>
+                        <button onclick="downloadBruteForceResults('xlsx')" style="padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1em; font-weight: bold; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3); transition: all 0.2s;">
+                            📈 Export Excel
+                        </button>
+                    </div>
                 </div>
             </div>
             <table class="kpi-table" style="width: 100%; font-size: 0.85em;">
