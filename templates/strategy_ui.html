@@ -351,6 +351,7 @@
             }
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
 </head>
 <body>
     <header>
@@ -1542,6 +1543,104 @@
             });
         }
 
+        let bruteForceLastResults = null;
+
+        function downloadBruteForceResults(format) {
+            if (!bruteForceLastResults || !bruteForceLastResults.length) {
+                alert('No results to download');
+                return;
+            }
+
+            const timestamp = new Date().toISOString().split('T')[0];
+            const filename = `brute_force_results_${timestamp}`;
+
+            if (format === 'csv') {
+                downloadCSV(bruteForceLastResults, filename);
+            } else if (format === 'xlsx') {
+                downloadXLSX(bruteForceLastResults, filename);
+            }
+        }
+
+        function downloadCSV(results, filename) {
+            // Prepare CSV headers
+            const headers = ['Rank', 'Parameters', 'Total Trades', 'Winning Trades', 'Losing Trades', 'Win Rate (%)', 'Total PnL', 'Max Drawdown', 'Profit Factor'];
+
+            // Prepare CSV rows
+            const rows = results.map((result, idx) => {
+                const paramStr = Object.entries(result.parameters || {})
+                    .map(([k, v]) => `${k}=${v}`)
+                    .join(' | ');
+
+                return [
+                    idx + 1,
+                    paramStr,
+                    result.total_trades,
+                    result.winning_trades,
+                    result.total_trades - result.winning_trades,
+                    (result.win_rate || 0).toFixed(2),
+                    result.total_pnl.toFixed(2),
+                    (result.max_drawdown || 0).toFixed(2),
+                    (result.profit_factor || 0).toFixed(4)
+                ];
+            });
+
+            // Create CSV content
+            let csv = headers.join(',') + '\n';
+            rows.forEach(row => {
+                csv += row.map(cell => {
+                    const str = String(cell);
+                    return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+                }).join(',') + '\n';
+            });
+
+            // Download
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename + '.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function downloadXLSX(results, filename) {
+            // Create workbook data
+            const worksheetData = [];
+
+            // Headers
+            worksheetData.push(['Rank', 'Parameters', 'Total Trades', 'Winning Trades', 'Losing Trades', 'Win Rate (%)', 'Total PnL', 'Max Drawdown', 'Profit Factor']);
+
+            // Data rows
+            results.forEach((result, idx) => {
+                const paramStr = Object.entries(result.parameters || {})
+                    .map(([k, v]) => `${k}=${v}`)
+                    .join(' | ');
+
+                worksheetData.push([
+                    idx + 1,
+                    paramStr,
+                    result.total_trades,
+                    result.winning_trades,
+                    result.total_trades - result.winning_trades,
+                    (result.win_rate || 0).toFixed(2),
+                    result.total_pnl.toFixed(2),
+                    (result.max_drawdown || 0).toFixed(2),
+                    (result.profit_factor || 0).toFixed(4)
+                ]);
+            });
+
+            // Use XLSX library if available, otherwise use CSV fallback
+            if (typeof XLSX !== 'undefined') {
+                const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Brute Force Results');
+                XLSX.writeFile(wb, filename + '.xlsx');
+            } else {
+                alert('XLSX library not available, downloading as CSV instead');
+                downloadCSV(results, filename);
+            }
+        }
+
         function displayBruteForceResults(data) {
             const container = document.getElementById('bruteforce-results');
             const results = data.results || [];
@@ -1551,12 +1650,23 @@
                 return;
             }
 
+            // Store results for download
+            bruteForceLastResults = results;
+
             // Sort by total_pnl descending
             results.sort((a, b) => b.total_pnl - a.total_pnl);
 
             let html = `
-            <div style="margin-bottom: 15px;">
+            <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
                 <p style="color: var(--text-secondary);">✅ Completed ${results.length} combinations</p>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="downloadBruteForceResults('csv')" style="padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
+                        📥 Download CSV
+                    </button>
+                    <button onclick="downloadBruteForceResults('xlsx')" style="padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
+                        📥 Download XLSX
+                    </button>
+                </div>
             </div>
             <table class="kpi-table" style="width: 100%; font-size: 0.85em;">
                 <thead><tr>
