@@ -662,13 +662,13 @@ def backtest_kpis():
         max_profit = float(trades_df['pnl'].max()) if 'pnl' in trades_df.columns else 0
         max_loss = float(trades_df['pnl'].min()) if 'pnl' in trades_df.columns else 0
 
-        # Calculate drawdowns from trades cumulative PnL
-        cumulative_pnl = trades_df['pnl'].cumsum() if 'pnl' in trades_df.columns else pd.Series([])
-        running_max = cumulative_pnl.expanding().max() if len(cumulative_pnl) > 0 else pd.Series([])
-        max_drawdown_cc = -(running_max - cumulative_pnl).max() if len(cumulative_pnl) > 0 else 0
+        # Use max_drawdown from strategy results (calculated from actual equity curve)
+        # This is the most accurate as it includes both trade PnL and floating P&L
+        strategy_max_drawdown = float(results.get('max_drawdown', 0))
+        max_drawdown_cc = -strategy_max_drawdown  # Negate because strategy returns positive value
 
-        # Max drawdown intrabar comes from results
-        max_drawdown_intrabar = float(results.get('max_drawdown', 0))
+        # For intrabar drawdown, use the same value from strategy (it uses equity curve)
+        max_drawdown_intrabar = max_drawdown_cc
 
         # Reorder KPIs to match specified order
         kpis = {
