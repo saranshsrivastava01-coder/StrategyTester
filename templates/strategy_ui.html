@@ -1670,13 +1670,13 @@
             </div>
             <table class="kpi-table" style="width: 100%; font-size: 0.85em;">
                 <thead><tr>
-                    <th style="width: 120px;">Parameters</th>
-                    <th style="width: 70px;">Trades</th>
-                    <th style="width: 70px;">Wins</th>
-                    <th style="width: 70px;">Win %</th>
-                    <th style="width: 100px;">Total PnL</th>
-                    <th style="width: 80px;">Max DD</th>
-                    <th style="width: 80px;">Profit Factor</th>
+                    <th style="width: 120px; text-align: center;">Parameters</th>
+                    <th style="width: 70px; text-align: center;">Trades</th>
+                    <th style="width: 70px; text-align: center;">Wins</th>
+                    <th style="width: 70px; text-align: center;">Win %</th>
+                    <th style="width: 100px; text-align: center;">Total PnL</th>
+                    <th style="width: 80px; text-align: center;">Max DD</th>
+                    <th style="width: 80px; text-align: center;">Profit Factor</th>
                 </tr></thead>
                 <tbody>
             `;
@@ -1688,13 +1688,13 @@
                     .join(', ');
 
                 html += `<tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="font-family: monospace; font-size: 0.8em;">${paramStr}</td>
+                    <td style="text-align: center; font-family: monospace; font-size: 0.8em;">${paramStr}</td>
                     <td style="text-align: center;">${result.total_trades}</td>
                     <td style="text-align: center; color: var(--success-color);">${result.winning_trades}</td>
                     <td style="text-align: center;">${(result.win_rate || 0).toFixed(2)}%</td>
-                    <td style="text-align: right; color: ${pnlColor}; font-weight: bold;">${formatIndianNumber(result.total_pnl.toFixed(2))}</td>
-                    <td style="text-align: right;">${formatIndianNumber((result.max_drawdown || 0).toFixed(2))}</td>
-                    <td style="text-align: right;">${(result.profit_factor || 0).toFixed(2)}</td>
+                    <td style="text-align: center; color: ${pnlColor}; font-weight: bold;">${formatIndianNumber(result.total_pnl.toFixed(2))}</td>
+                    <td style="text-align: center;">${formatIndianNumber((result.max_drawdown || 0).toFixed(2))}</td>
+                    <td style="text-align: center;">${(result.profit_factor || 0).toFixed(2)}</td>
                 </tr>`;
             });
 
