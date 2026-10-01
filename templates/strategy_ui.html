@@ -477,10 +477,17 @@
 
         <!-- Parameters -->
         <div class="panel" id="tester-params-panel" style="display: none; margin-bottom: 20px; border-left: 4px solid var(--accent-color);">
-            <h2>⚙️ Strategy Parameters</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Adjust parameters below and they will be used in the backtest</p>
-            <div id="tester-params-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px;">
-                <!-- Parameters will be displayed here -->
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <button class="collapse-toggle" onclick="toggleCollapsable('tester-params-content')" style="background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 0; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--text-primary); transition: transform 0.2s;">
+                    ▼
+                </button>
+                <h2 style="margin: 0;">⚙️ Strategy Parameters</h2>
+            </div>
+            <div id="tester-params-content" style="transition: max-height 0.3s ease, opacity 0.3s ease; max-height: 9999px; opacity: 1; overflow: hidden;">
+                <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Adjust parameters below and they will be used in the backtest</p>
+                <div id="tester-params-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px;">
+                    <!-- Parameters will be displayed here -->
+                </div>
             </div>
         </div>
 
@@ -499,33 +506,61 @@
 
         <!-- Summary Stats - All 10 KPIs -->
         <div class="panel" style="margin-bottom: 20px;">
-            <h2>📊 Performance Summary - All 10 KPIs</h2>
-            <div id="tester-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-top: 15px;">
-                <!-- KPIs will be populated here -->
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <button class="collapse-toggle" onclick="toggleCollapsable('tester-summary-content')" style="background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 0; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--text-primary); transition: transform 0.2s;">
+                    ▼
+                </button>
+                <h2 style="margin: 0;">📊 Performance Summary - All 10 KPIs</h2>
+            </div>
+            <div id="tester-summary-content" style="transition: max-height 0.3s ease, opacity 0.3s ease; max-height: 9999px; opacity: 1; overflow: hidden;">
+                <div id="tester-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-top: 15px;">
+                    <!-- KPIs will be populated here -->
+                </div>
             </div>
         </div>
 
         <!-- Monthly Statistics -->
         <div class="panel">
-            <h2>📅 Monthly Statistics</h2>
-            <div id="monthly-stats" style="max-height: 400px; overflow-y: auto;">
-                <p style="color: var(--text-secondary);">Monthly breakdown will appear here after running backtest</p>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <button class="collapse-toggle" onclick="toggleCollapsable('monthly-stats-content')" style="background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 0; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--text-primary); transition: transform 0.2s;">
+                    ▼
+                </button>
+                <h2 style="margin: 0;">📅 Monthly Statistics</h2>
+            </div>
+            <div id="monthly-stats-content" style="transition: max-height 0.3s ease, opacity 0.3s ease; max-height: 9999px; opacity: 1; overflow: hidden;">
+                <div id="monthly-stats" style="max-height: 400px; overflow-y: auto;">
+                    <p style="color: var(--text-secondary);">Monthly breakdown will appear here after running backtest</p>
+                </div>
             </div>
         </div>
 
         <!-- Day-wise Statistics -->
         <div class="panel">
-            <h2>📆 Day-wise Statistics</h2>
-            <div id="daywise-stats" style="max-height: 400px; overflow-y: auto;">
-                <p style="color: var(--text-secondary);">Day-wise breakdown will appear here after running backtest</p>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <button class="collapse-toggle" onclick="toggleCollapsable('daywise-stats-content')" style="background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 0; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--text-primary); transition: transform 0.2s;">
+                    ▼
+                </button>
+                <h2 style="margin: 0;">📆 Day-wise Statistics</h2>
+            </div>
+            <div id="daywise-stats-content" style="transition: max-height 0.3s ease, opacity 0.3s ease; max-height: 9999px; opacity: 1; overflow: hidden;">
+                <div id="daywise-stats" style="max-height: 400px; overflow-y: auto;">
+                    <p style="color: var(--text-secondary);">Day-wise breakdown will appear here after running backtest</p>
+                </div>
             </div>
         </div>
 
         <!-- Trade List -->
         <div class="panel">
-            <h2>📋 Trade List</h2>
-            <div id="tester-trades" style="max-height: 600px; overflow-y: auto;">
-                <p style="color: var(--text-secondary);">Trades will appear here after running backtest</p>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <button class="collapse-toggle" onclick="toggleCollapsable('tester-trades-content')" style="background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 0; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--text-primary); transition: transform 0.2s;">
+                    ▼
+                </button>
+                <h2 style="margin: 0;">📋 Trade List</h2>
+            </div>
+            <div id="tester-trades-content" style="transition: max-height 0.3s ease, opacity 0.3s ease; max-height: 9999px; opacity: 1; overflow: hidden;">
+                <div id="tester-trades" style="max-height: 600px; overflow-y: auto;">
+                    <p style="color: var(--text-secondary);">Trades will appear here after running backtest</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1107,6 +1142,25 @@
                     }
                 })
                 .catch(e => showStatus('tester-ohlc-status', `❌ Error: ${e}`, 'error'));
+        }
+
+        function toggleCollapsable(contentId) {
+            const content = document.getElementById(contentId);
+            const toggle = event.target.closest('.collapse-toggle');
+
+            if (!content) return;
+
+            const isCollapsed = content.style.maxHeight === '0px' || content.style.maxHeight === '0';
+
+            if (isCollapsed) {
+                content.style.maxHeight = '9999px';
+                content.style.opacity = '1';
+                toggle.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.maxHeight = '0';
+                content.style.opacity = '0';
+                toggle.style.transform = 'rotate(-90deg)';
+            }
         }
 
         function displayTesterResults(data) {
