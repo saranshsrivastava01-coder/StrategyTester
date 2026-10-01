@@ -543,7 +543,14 @@
 
         <!-- Parameter Configuration -->
         <div class="panel">
-            <h2>⚙️ Parameter Configuration</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 15px;">
+                <h2 style="margin: 0;">⚙️ Parameter Configuration</h2>
+                <div>
+                    <button onclick="runBruteForceTest()" style="padding: 6px 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8em; font-weight: bold; transition: all 0.2s; white-space: nowrap;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                        🚀 Test
+                    </button>
+                </div>
+            </div>
             <div id="bruteforce-params" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <p style="color: var(--text-secondary); grid-column: 1/-1;">Upload strategy file to extract parameters</p>
             </div>
@@ -1354,6 +1361,7 @@
         let bruteForcePythonScript = null;
         let bruteForceOHLCData = null;
         let bruteForceParameters = {};
+        let bruteForceMetadata = {};
 
         document.getElementById('bruteforce-python')?.addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -1380,6 +1388,25 @@
             if (!defaultParamsMatch) {
                 container.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1/-1;">No DEFAULT_PARAMS found in code</p>';
                 return;
+            }
+
+            // Extract PARAMETER_METADATA if it exists
+            const metadataMatch = bruteForcePythonScript.match(/PARAMETER_METADATA\s*=\s*\{([\s\S]*?)\n\}/);
+            if (metadataMatch) {
+                try {
+                    // Parse metadata - convert Python dict syntax to JSON
+                    let metadataStr = '{' + metadataMatch[1] + '}';
+                    // Remove Python comments (lines starting with #)
+                    metadataStr = metadataStr.split('\n').filter(line => !line.trim().startsWith('#')).join('\n');
+                    // Replace Python-style strings and syntax with JSON
+                    metadataStr = metadataStr.replace(/'/g, '"');
+                    // Remove trailing commas before closing braces/brackets
+                    metadataStr = metadataStr.replace(/,(\s*[}\]])/g, '$1');
+                    bruteForceMetadata = JSON.parse(metadataStr);
+                } catch (e) {
+                    console.warn('Could not parse PARAMETER_METADATA:', e);
+                    bruteForceMetadata = {};
+                }
             }
 
             const paramLines = defaultParamsMatch[1].split('\n').filter(line => line.includes(':'));
@@ -1472,7 +1499,7 @@
                 const calcResp = await fetch('/api/calculate-combinations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ parameter_configs: paramConfigs })
+                    body: JSON.stringify({ parameter_configs: paramConfigs, parameter_metadata: bruteForceMetadata })
                 });
 
                 const calcData = await calcResp.json();
@@ -1547,7 +1574,8 @@
             const requestData = {
                 python_code: bruteForcePythonScript,
                 ohlc_content: bruteForceOHLCData,
-                parameter_configs: paramConfigs
+                parameter_configs: paramConfigs,
+                parameter_metadata: bruteForceMetadata
             };
 
             const startTime = Date.now();
