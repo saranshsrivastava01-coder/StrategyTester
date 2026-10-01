@@ -513,6 +513,14 @@
             </div>
         </div>
 
+        <!-- Day-wise Statistics -->
+        <div class="panel">
+            <h2>📆 Day-wise Statistics</h2>
+            <div id="daywise-stats" style="max-height: 400px; overflow-y: auto;">
+                <p style="color: var(--text-secondary);">Day-wise breakdown will appear here after running backtest</p>
+            </div>
+        </div>
+
         <!-- Trade List -->
         <div class="panel">
             <h2>📋 Trade List</h2>
@@ -544,15 +552,22 @@
         <!-- Parameter Configuration -->
         <div class="panel">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 15px;">
-                <h2 style="margin: 0;">⚙️ Parameter Configuration</h2>
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                    <button id="param-config-toggle" onclick="toggleParameterConfig()" style="background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 0; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--text-primary); transition: transform 0.2s;">
+                        ▼
+                    </button>
+                    <h2 style="margin: 0;">⚙️ Parameter Configuration</h2>
+                </div>
                 <div>
                     <button onclick="runBruteForceTest()" style="padding: 6px 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8em; font-weight: bold; transition: all 0.2s; white-space: nowrap;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                         🚀 Test
                     </button>
                 </div>
             </div>
-            <div id="bruteforce-params" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <p style="color: var(--text-secondary); grid-column: 1/-1;">Upload strategy file to extract parameters</p>
+            <div id="param-config-content" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; transition: max-height 0.3s ease, opacity 0.3s ease; max-height: 9999px; opacity: 1; overflow: hidden;">
+                <div id="bruteforce-params" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; grid-column: 1/-1;">
+                    <p style="color: var(--text-secondary); grid-column: 1/-1;">Upload strategy file to extract parameters</p>
+                </div>
             </div>
         </div>
 
@@ -1127,6 +1142,9 @@
             // Display monthly statistics
             displayMonthlyStats(data);
 
+            // Display day-wise statistics
+            displayDayWiseStats(data);
+
             // Display trades table
             displayTesterTrades(data);
         }
@@ -1357,11 +1375,116 @@
             container.innerHTML = html;
         }
 
+        function displayDayWiseStats(data) {
+            const container = document.getElementById('daywise-stats');
+            const trades = data.trades || data.kpis?.trades || [];
+
+            if (!Array.isArray(trades) || trades.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No trades found</p>';
+                return;
+            }
+
+            // Group trades by day of week
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayWiseData = {};
+
+            // Initialize all days
+            dayNames.forEach((day, idx) => {
+                dayWiseData[idx] = {
+                    label: day,
+                    trades: [],
+                    totalTrades: 0,
+                    winningTrades: 0,
+                    losingTrades: 0,
+                    totalPnL: 0,
+                    largestProfit: 0,
+                    largestLoss: 0
+                };
+            });
+
+            trades.forEach(trade => {
+                const date = new Date(trade.exit_time);
+                const dayOfWeek = date.getDay();
+
+                dayWiseData[dayOfWeek].trades.push(trade);
+                dayWiseData[dayOfWeek].totalTrades++;
+
+                if (trade.pnl > 0) {
+                    dayWiseData[dayOfWeek].winningTrades++;
+                    dayWiseData[dayOfWeek].largestProfit = Math.max(dayWiseData[dayOfWeek].largestProfit, trade.pnl);
+                } else if (trade.pnl < 0) {
+                    dayWiseData[dayOfWeek].losingTrades++;
+                    dayWiseData[dayOfWeek].largestLoss = Math.min(dayWiseData[dayOfWeek].largestLoss, trade.pnl);
+                }
+
+                dayWiseData[dayOfWeek].totalPnL += trade.pnl;
+            });
+
+            // Create table
+            let html = '<table class="kpi-table" style="width: 100%; font-size: 0.9em;"><thead><tr>';
+            html += '<th style="width: 100px;">Day</th>';
+            html += '<th style="width: 80px;">Total Trades</th>';
+            html += '<th style="width: 100px;">Winning</th>';
+            html += '<th style="width: 100px;">Losing</th>';
+            html += '<th style="width: 100px;">Daily PnL</th>';
+            html += '<th style="width: 120px;">Largest Profit</th>';
+            html += '<th style="width: 120px;">Largest Loss</th>';
+            html += '</tr></thead><tbody>';
+
+            // Sort by day of week (0-6)
+            for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+                const day = dayWiseData[dayIdx];
+                if (day.totalTrades === 0) continue; // Skip days with no trades
+
+                const pnlColor = day.totalPnL >= 0 ? 'var(--success-color)' : '#ef4444';
+                const profitColor = day.largestProfit > 0 ? 'var(--success-color)' : '#999';
+                const lossColor = day.largestLoss < 0 ? '#ef4444' : '#999';
+                const winRate = day.totalTrades > 0 ? ((day.winningTrades / day.totalTrades) * 100).toFixed(1) : 0;
+
+                html += `<tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="font-weight: 500;">${day.label}</td>
+                    <td style="text-align: center;">${formatIndianNumber(day.totalTrades)}</td>
+                    <td style="text-align: center; color: var(--success-color);">${formatIndianNumber(day.winningTrades)} (${winRate}%)</td>
+                    <td style="text-align: center; color: #ef4444;">${formatIndianNumber(day.losingTrades)}</td>
+                    <td style="text-align: right; color: ${pnlColor}; font-weight: bold;">
+                        ${day.totalPnL > 0 ? '+' : ''}${formatIndianNumber(day.totalPnL.toFixed(2))}
+                    </td>
+                    <td style="text-align: right; color: ${profitColor};">
+                        ${day.largestProfit > 0 ? '+' : ''}${formatIndianNumber(day.largestProfit.toFixed(2))}
+                    </td>
+                    <td style="text-align: right; color: ${lossColor};">
+                        ${day.largestLoss < 0 ? '' : ''}${formatIndianNumber(day.largestLoss.toFixed(2))}
+                    </td>
+                </tr>`;
+            }
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
         // ===== BRUTE FORCE TESTER FUNCTIONS =====
         let bruteForcePythonScript = null;
         let bruteForceOHLCData = null;
         let bruteForceParameters = {};
         let bruteForceMetadata = {};
+        let paramConfigCollapsed = false;
+
+        function toggleParameterConfig() {
+            const content = document.getElementById('param-config-content');
+            const toggle = document.getElementById('param-config-toggle');
+
+            paramConfigCollapsed = !paramConfigCollapsed;
+
+            if (paramConfigCollapsed) {
+                content.style.maxHeight = '0';
+                content.style.opacity = '0';
+                toggle.style.transform = 'rotate(-90deg)';
+            } else {
+                content.style.maxHeight = '9999px';
+                content.style.opacity = '1';
+                toggle.style.transform = 'rotate(0deg)';
+            }
+        }
 
         document.getElementById('bruteforce-python')?.addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -1417,10 +1540,16 @@
                 if (match) {
                     const paramName = match[1];
                     const defaultValue = match[2].trim().replace(/['"]/g, '');
+                    const metadata = bruteForceMetadata[paramName];
+                    const hasDecimalStep = metadata && metadata.step && parseFloat(metadata.step) < 1;
+                    const stepValue = metadata?.step || 1;
 
                     html += `
                     <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; border-left: 3px solid #3b82f6;">
-                        <div style="font-weight: 600; margin-bottom: 12px; font-size: 0.95em;">${paramName}</div>
+                        <div style="font-weight: 600; margin-bottom: 12px; font-size: 0.95em;">
+                            ${paramName}
+                            ${hasDecimalStep ? '<span style="font-size: 0.75em; color: #fbbf24; margin-left: 8px;">(Decimal Step: ' + stepValue + ')</span>' : ''}
+                        </div>
 
                         <!-- Option 1: Range -->
                         <div style="margin-bottom: 12px; padding: 10px; background: var(--panel-bg); border-radius: 6px;">
@@ -1438,6 +1567,13 @@
                                     <input type="text" id="param-to-${idx}" placeholder="${defaultValue}" style="padding: 6px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; box-sizing: border-box;" disabled>
                                 </div>
                             </div>
+                            ${hasDecimalStep ? `
+                            <div style="margin-top: 8px; margin-left: 28px;">
+                                <label style="font-size: 0.8em;">Step Size:</label>
+                                <input type="text" id="param-step-${idx}" placeholder="${stepValue}" value="${stepValue}" style="padding: 6px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; box-sizing: border-box;" disabled>
+                                <span style="font-size: 0.75em; color: var(--text-secondary); margin-top: 4px; display: block;">Default: ${stepValue}</span>
+                            </div>
+                            ` : ''}
                         </div>
 
                         <!-- Option 2: Custom Value -->
@@ -1478,6 +1614,13 @@
                         // Enable/disable inputs based on checkbox state
                         document.getElementById(`param-from-${paramIdx}`).disabled = !isRange;
                         document.getElementById(`param-to-${paramIdx}`).disabled = !isRange;
+
+                        // Enable/disable step input if it exists
+                        const stepInput = document.getElementById(`param-step-${paramIdx}`);
+                        if (stepInput) {
+                            stepInput.disabled = !isRange;
+                        }
+
                         document.getElementById(`param-custom-value-${paramIdx}`).disabled = !isCustom;
                     });
                 });
@@ -1493,13 +1636,22 @@
             }
 
             // First, calculate total combinations
-            const paramConfigs = collectParameterConfigs();
+            const { configs: paramConfigs, customSteps } = collectParameterConfigs();
+
+            // Merge custom steps into metadata
+            const metadataWithCustomSteps = { ...bruteForceMetadata };
+            Object.keys(customSteps).forEach(paramName => {
+                if (!metadataWithCustomSteps[paramName]) {
+                    metadataWithCustomSteps[paramName] = {};
+                }
+                metadataWithCustomSteps[paramName].step = customSteps[paramName];
+            });
 
             try {
                 const calcResp = await fetch('/api/calculate-combinations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ parameter_configs: paramConfigs, parameter_metadata: bruteForceMetadata })
+                    body: JSON.stringify({ parameter_configs: paramConfigs, parameter_metadata: metadataWithCustomSteps })
                 });
 
                 const calcData = await calcResp.json();
@@ -1513,7 +1665,7 @@
                 }
 
                 // Start the actual test
-                startBruteForceTest(paramConfigs);
+                startBruteForceTest(paramConfigs, metadataWithCustomSteps);
 
             } catch (err) {
                 alert('Error calculating combinations: ' + err.message);
@@ -1522,11 +1674,19 @@
 
         function collectParameterConfigs() {
             const paramConfigs = {};
+            const customSteps = {};
+
             Object.keys(bruteForceParameters).forEach(paramName => {
                 const idx = bruteForceParameters[paramName].index;
                 const isRangeChecked = document.getElementById(`param-range-${idx}`).checked;
                 const isCustomChecked = document.getElementById(`param-custom-${idx}`).checked;
                 const defaultValue = bruteForceParameters[paramName].default;
+
+                // Get custom step value if available
+                const stepInput = document.getElementById(`param-step-${idx}`);
+                if (stepInput && stepInput.value) {
+                    customSteps[paramName] = parseFloat(stepInput.value);
+                }
 
                 // Determine which value(s) to use
                 if (!isRangeChecked && !isCustomChecked) {
@@ -1563,10 +1723,11 @@
                     };
                 }
             });
-            return paramConfigs;
+
+            return { configs: paramConfigs, customSteps };
         }
 
-        function startBruteForceTest(paramConfigs) {
+        function startBruteForceTest(paramConfigs, metadata) {
             const resultsContainer = document.getElementById('bruteforce-results');
             resultsContainer.innerHTML = '<div style="padding: 20px;"><p style="color: var(--text-secondary); font-size: 1.1em; margin-bottom: 15px;">🔄 Test Running...</p><div id="progress-monitor" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; font-size: 0.9em; line-height: 1.8; font-family: monospace; color: var(--text-primary);"><p>Initializing test...</p></div></div>';
 
@@ -1575,7 +1736,7 @@
                 python_code: bruteForcePythonScript,
                 ohlc_content: bruteForceOHLCData,
                 parameter_configs: paramConfigs,
-                parameter_metadata: bruteForceMetadata
+                parameter_metadata: metadata || bruteForceMetadata
             };
 
             const startTime = Date.now();
