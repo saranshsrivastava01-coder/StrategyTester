@@ -19,16 +19,19 @@
         }
 
         [data-theme="dark"] {
-            --bg-primary: #1e1e1e;
-            --bg-secondary: #2d2d2d;
-            --text-primary: #e0e0e0;
-            --text-secondary: #b0b0b0;
-            --border-color: #444;
-            --header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --panel-bg: #2d2d2d;
-            --panel-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            --table-hover: #3a3a3a;
-            --input-border: #444;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1a1f2e;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --border-color: #2d3e5f;
+            --header-bg: linear-gradient(135deg, #0f172a 0%, #1a2540 100%);
+            --panel-bg: #15202b;
+            --panel-shadow: 0 4px 16px rgba(59, 130, 246, 0.1);
+            --table-hover: #1f2d42;
+            --input-border: #2d3e5f;
+            --accent-color: #3b82f6;
+            --accent-dark: #2563eb;
+            --success-color: #10b981;
         }
 
         * {
@@ -59,19 +62,37 @@
             flex: 1;
         }
 
-        .theme-toggle {
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: background 0.2s;
+        .theme-switcher {
+            display: flex;
+            gap: 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 4px;
+            border: 1px solid rgba(255,255,255,0.2);
         }
 
-        .theme-toggle:hover {
-            background: rgba(255,255,255,0.3);
+        .theme-btn {
+            background: transparent;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.2s;
+            opacity: 0.6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .theme-btn:hover {
+            opacity: 0.9;
+        }
+
+        .theme-btn.active {
+            background: rgba(255,255,255,0.2);
+            opacity: 1;
         }
 
 
@@ -104,8 +125,8 @@
         .panel h2 {
             font-size: 1.3em;
             margin-bottom: 15px;
-            color: #667eea;
-            border-bottom: 2px solid #667eea;
+            color: var(--accent-color, #667eea);
+            border-bottom: 2px solid var(--accent-color, #667eea);
             padding-bottom: 8px;
         }
 
@@ -132,7 +153,7 @@
         }
 
         button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
             color: white;
             padding: 10px 20px;
             border: none;
@@ -141,11 +162,13 @@
             font-weight: 600;
             cursor: pointer;
             width: 100%;
-            transition: transform 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
         }
 
         button:hover {
             transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
         }
 
         .status-message {
@@ -186,7 +209,7 @@
         }
 
         .kpi-table thead {
-            background: #667eea;
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
             color: white;
         }
 
@@ -194,7 +217,7 @@
             padding: 12px;
             text-align: left;
             font-weight: 600;
-            border-bottom: 2px solid #667eea;
+            border-bottom: 2px solid #3b82f6;
         }
 
         .kpi-table td {
@@ -208,7 +231,7 @@
 
         .kpi-name {
             font-weight: 600;
-            color: #667eea;
+            color: #3b82f6;
             width: 25%;
         }
 
@@ -273,7 +296,11 @@
             <h1>📊 Strategy Reconciliation</h1>
             <p>Pine Script (TradingView) vs Python (Backtest) - Side by Side Comparison</p>
         </div>
-        <button class="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+        <div class="theme-switcher">
+            <button class="theme-btn" onclick="setTheme('light')" title="Light mode">💻</button>
+            <button class="theme-btn" onclick="setTheme('auto')" title="Auto (system)">🌓</button>
+            <button class="theme-btn" onclick="setTheme('dark')" title="Dark mode">🌙</button>
+        </div>
     </header>
 
     <div class="container">
@@ -348,30 +375,41 @@
     <script>
         // Initialize theme
         function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            applyTheme(savedTheme);
+            const savedTheme = localStorage.getItem('theme') || 'auto';
+            setTheme(savedTheme);
         }
 
-        function toggleTheme() {
+        function setTheme(theme) {
             const html = document.documentElement;
-            const currentTheme = html.getAttribute('data-theme') || 'light';
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            applyTheme(newTheme);
-            localStorage.setItem('theme', newTheme);
-        }
 
-        function applyTheme(theme) {
-            const html = document.documentElement;
-            const button = document.querySelector('.theme-toggle');
-
-            if (theme === 'dark') {
+            if (theme === 'auto') {
+                // Use system preference
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+            } else if (theme === 'dark') {
                 html.setAttribute('data-theme', 'dark');
-                button.textContent = '☀️ Light';
             } else {
                 html.removeAttribute('data-theme');
-                button.textContent = '🌙 Dark';
             }
+
+            // Save preference
+            localStorage.setItem('theme', theme);
+
+            // Update button states
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.querySelector(`button[onclick="setTheme('${theme}')"]`).classList.add('active');
         }
+
+        // Listen to system theme changes when in auto mode
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            const savedTheme = localStorage.getItem('theme') || 'auto';
+            if (savedTheme === 'auto') {
+                setTheme('auto');
+            }
+        });
 
         // Initialize on load
         window.addEventListener('DOMContentLoaded', initTheme);
