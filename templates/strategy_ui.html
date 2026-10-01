@@ -1709,38 +1709,6 @@
             });
 
             html += '</tbody></table>';
-
-            // Add monthly statistics section for the best result
-            if (results.length > 0 && results[0].monthly_stats && Object.keys(results[0].monthly_stats).length > 0) {
-                html += `
-                <div style="margin-top: 30px;">
-                    <h3 style="color: var(--text-primary); margin-bottom: 15px;">📅 Monthly Statistics (Best Result)</h3>
-                    <table class="kpi-table" style="width: 100%; font-size: 0.85em;">
-                        <thead><tr>
-                            <th style="width: 120px; text-align: center;">Month</th>
-                            <th style="width: 80px; text-align: center;">Total Trades</th>
-                            <th style="width: 80px; text-align: center;">Wins</th>
-                            <th style="width: 80px; text-align: center;">Losses</th>
-                            <th style="width: 100px; text-align: center;">Profit</th>
-                            <th style="width: 100px; text-align: center;">Loss</th>
-                        </tr></thead>
-                        <tbody>
-                `;
-
-                Object.entries(results[0].monthly_stats).forEach(([month, stats]) => {
-                    html += `<tr style="border-bottom: 1px solid var(--border-color);">
-                        <td style="text-align: center; font-weight: bold;">${month}</td>
-                        <td style="text-align: center;">${stats.trades}</td>
-                        <td style="text-align: center; color: var(--success-color);">${stats.wins}</td>
-                        <td style="text-align: center; color: #ef4444;">${stats.losses}</td>
-                        <td style="text-align: center; color: var(--success-color); font-weight: bold;">${formatIndianNumber(stats.profit.toFixed(2))}</td>
-                        <td style="text-align: center; color: #ef4444; font-weight: bold;">${formatIndianNumber(stats.loss.toFixed(2))}</td>
-                    </tr>`;
-                });
-
-                html += '</tbody></table></div>';
-            }
-
             container.innerHTML = html;
         }
 
