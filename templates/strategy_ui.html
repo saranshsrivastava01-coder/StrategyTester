@@ -410,39 +410,46 @@
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: PYTHON + OHLC -->
+        <!-- RIGHT COLUMN: PYTHON + EXCEL + OHLC (Side by Side) -->
         <div class="column right-column">
-            <div class="panel">
-                <h2>🐍 Python Strategy</h2>
-                <div class="form-group">
-                    <label>Upload .py file:</label>
-                    <input type="file" id="python-file" accept=".py">
+            <!-- Upload Tiles Row (3 Columns) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <!-- Python Strategy Tile -->
+                <div class="panel">
+                    <h2>🐍 Python Strategy</h2>
+                    <div class="form-group">
+                        <label>Upload .py file:</label>
+                        <input type="file" id="python-file" accept=".py">
+                    </div>
+                    <button onclick="uploadPythonFile()" style="width: 100%;">Upload</button>
+                    <div id="python-status" class="status-message"></div>
                 </div>
-                <button onclick="uploadPythonFile()">Upload</button>
-                <div id="python-status" class="status-message"></div>
+
+                <!-- Excel (for parameters) Tile -->
+                <div class="panel">
+                    <h2>📊 Excel (for parameters)</h2>
+                    <div class="form-group">
+                        <label>Upload .xlsx file:</label>
+                        <input type="file" id="python-excel-file" accept=".xlsx">
+                    </div>
+                    <button onclick="uploadPythonExcelFile()" style="width: 100%;">Upload & Extract</button>
+                    <div id="python-excel-status" class="status-message"></div>
+                </div>
+
+                <!-- OHLC Data Tile -->
+                <div class="panel">
+                    <h2>📈 OHLC Data</h2>
+                    <div class="form-group">
+                        <label>Upload CSV file:</label>
+                        <input type="file" id="ohlc-file" accept=".csv">
+                    </div>
+                    <button onclick="uploadOHLCFile()" style="width: 100%;">Upload</button>
+                    <button onclick="runPythonBacktest()" style="margin-top: 10px; width: 100%;">Run Backtest</button>
+                    <div id="ohlc-status" class="status-message"></div>
+                </div>
             </div>
 
-            <div class="panel">
-                <h2>📊 Excel (for parameters)</h2>
-                <div class="form-group">
-                    <label>Upload .xlsx file (to extract parameters):</label>
-                    <input type="file" id="python-excel-file" accept=".xlsx">
-                </div>
-                <button onclick="uploadPythonExcelFile()">Upload & Extract Parameters</button>
-                <div id="python-excel-status" class="status-message"></div>
-            </div>
-
-            <div class="panel">
-                <h2>📈 OHLC Data</h2>
-                <div class="form-group">
-                    <label>Upload CSV file:</label>
-                    <input type="file" id="ohlc-file" accept=".csv">
-                </div>
-                <button onclick="uploadOHLCFile()">Upload</button>
-                <button onclick="runPythonBacktest()" style="margin-top: 10px;">Run Backtest</button>
-                <div id="ohlc-status" class="status-message"></div>
-            </div>
-
+            <!-- Python KPIs Panel (Full Width) -->
             <div class="panel kpi-container" id="python-kpi-panel" style="display: none;">
                 <h2>🎯 Python vs Excel KPIs</h2>
                 <div id="python-kpis"></div>
