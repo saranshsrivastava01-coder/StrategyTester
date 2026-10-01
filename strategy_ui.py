@@ -1026,25 +1026,54 @@ def bruteforce_test():
                 trades_df = pd.DataFrame(trades_list)
                 total_trades = len(trades_df)
                 winning = len(trades_df[trades_df['pnl'] > 0]) if 'pnl' in trades_df.columns else 0
+                losing = len(trades_df[trades_df['pnl'] < 0]) if 'pnl' in trades_df.columns else 0
                 total_pnl = float(trades_df['pnl'].sum()) if 'pnl' in trades_df.columns else 0
                 profit_factor = 0
+                max_profit = 0
+                max_loss = 0
 
                 if total_trades > 0:
                     gross_profit = float(trades_df[trades_df['pnl'] > 0]['pnl'].sum()) if 'pnl' in trades_df.columns else 0
                     gross_loss = float(abs(trades_df[trades_df['pnl'] < 0]['pnl'].sum())) if 'pnl' in trades_df.columns else 0
                     profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
                     win_rate = (winning / total_trades * 100) if total_trades > 0 else 0
+
+                    # Max profit and max loss per trade
+                    if 'pnl' in trades_df.columns:
+                        max_profit = float(trades_df['pnl'].max()) if len(trades_df) > 0 else 0
+                        max_loss = float(trades_df['pnl'].min()) if len(trades_df) > 0 else 0
                 else:
                     win_rate = 0
+
+                # Calculate monthly statistics
+                monthly_stats = {}
+                if not trades_df.empty and 'exit_time' in trades_df.columns:
+                    trades_df['month'] = pd.to_datetime(trades_df['exit_time']).dt.to_period('M')
+                    for month, month_trades in trades_df.groupby('month'):
+                        wins = len(month_trades[month_trades['pnl'] > 0])
+                        losses = len(month_trades[month_trades['pnl'] < 0])
+                        profit = float(month_trades[month_trades['pnl'] > 0]['pnl'].sum()) if 'pnl' in month_trades.columns else 0
+                        loss = float(abs(month_trades[month_trades['pnl'] < 0]['pnl'].sum())) if 'pnl' in month_trades.columns else 0
+                        monthly_stats[str(month)] = {
+                            'trades': len(month_trades),
+                            'wins': wins,
+                            'losses': losses,
+                            'profit': profit,
+                            'loss': loss
+                        }
 
                 results.append({
                     'parameters': resolved_combo,
                     'total_trades': total_trades,
                     'winning_trades': winning,
+                    'losing_trades': losing,
                     'win_rate': win_rate,
+                    'max_profit': max_profit,
+                    'max_loss': max_loss,
                     'total_pnl': total_pnl,
                     'max_drawdown': float(result.get('max_drawdown', 0)),
-                    'profit_factor': profit_factor
+                    'profit_factor': profit_factor,
+                    'monthly_stats': monthly_stats
                 })
             except Exception as e:
                 # Log error but continue with other combinations
