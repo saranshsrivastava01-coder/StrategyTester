@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strategy Reconciliation - Side by Side</title>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --text-primary: #333;
+            --text-secondary: #666;
+            --border-color: #ddd;
+            --header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --panel-bg: #ffffff;
+            --panel-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            --table-hover: #f9f9f9;
+            --input-border: #ddd;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --border-color: #444;
+            --header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --panel-bg: #2d2d2d;
+            --panel-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            --table-hover: #3a3a3a;
+            --input-border: #444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: background 0.3s, color 0.3s;
+        }
+
+        header {
+            background: var(--header-bg);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            flex: 1;
+        }
+
+        .theme-toggle {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1800px;
+            margin: 0 auto;
+            height: calc(100vh - 100px);
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: var(--panel-shadow);
+            flex-shrink: 0;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+
+        .panel h2 {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--input-border);
+            border-radius: 5px;
+            font-size: 0.9em;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        .status-message {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.85em;
+            display: none;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+
+        .status-message.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+
+        .kpi-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
+
+        .kpi-table thead {
+            background: #667eea;
+            color: white;
+        }
+
+        .kpi-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .kpi-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .kpi-table tr:hover {
+            background: var(--table-hover);
+        }
+
+        .kpi-name {
+            font-weight: 600;
+            color: #667eea;
+            width: 25%;
+        }
+
+        .kpi-value-cell {
+            width: 20%;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        .match-status {
+            width: 15%;
+            text-align: center;
+        }
+
+        .match-status.match {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .match-status.mismatch {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .left-column {
+            border-right: 2px solid #ddd;
+            padding-right: 10px;
+        }
+
+        .right-column {
+            padding-left: 10px;
+        }
+
+        .kpi-container {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .left-column {
+                border-right: none;
+                border-bottom: 2px solid #ddd;
+                padding-right: 0;
+                padding-bottom: 10px;
+            }
+
+            .right-column {
+                padding-left: 0;
+                padding-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>📊 Strategy Reconciliation</h1>
+            <p>Pine Script (TradingView) vs Python (Backtest) - Side by Side Comparison</p>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+    </header>
+
+    <div class="container">
+        <!-- LEFT COLUMN: PINE SCRIPT + EXCEL -->
+        <div class="column left-column">
+            <div class="panel">
+                <h2>📄 Pine Script</h2>
+                <div class="form-group">
+                    <label>Upload .pine file:</label>
+                    <input type="file" id="pine-file" accept=".pine,.txt,.pinescript">
+                </div>
+                <button onclick="uploadPineScript()">Upload</button>
+                <div id="pine-status" class="status-message"></div>
+            </div>
+
+            <div class="panel">
+                <h2>📊 Output Excel</h2>
+                <div class="form-group">
+                    <label>Upload .xlsx file:</label>
+                    <input type="file" id="excel-file" accept=".xlsx">
+                </div>
+                <button onclick="uploadExcelFile()">Upload & Analyze</button>
+                <div id="excel-status" class="status-message"></div>
+            </div>
+
+            <div class="panel kpi-container" id="excel-kpi-panel" style="display: none;">
+                <h2>🎯 Excel KPIs</h2>
+                <div id="excel-kpis"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: PYTHON + OHLC -->
+        <div class="column right-column">
+            <div class="panel">
+                <h2>🐍 Python Strategy</h2>
+                <div class="form-group">
+                    <label>Upload .py file:</label>
+                    <input type="file" id="python-file" accept=".py">
+                </div>
+                <button onclick="uploadPythonFile()">Upload</button>
+                <div id="python-status" class="status-message"></div>
+            </div>
+
+            <div class="panel">
+                <h2>📊 Excel (for parameters)</h2>
+                <div class="form-group">
+                    <label>Upload .xlsx file (to extract parameters):</label>
+                    <input type="file" id="python-excel-file" accept=".xlsx">
+                </div>
+                <button onclick="uploadPythonExcelFile()">Upload & Extract Parameters</button>
+                <div id="python-excel-status" class="status-message"></div>
+            </div>
+
+            <div class="panel">
+                <h2>📈 OHLC Data</h2>
+                <div class="form-group">
+                    <label>Upload CSV file:</label>
+                    <input type="file" id="ohlc-file" accept=".csv">
+                </div>
+                <button onclick="uploadOHLCFile()">Upload</button>
+                <button onclick="runPythonBacktest()" style="margin-top: 10px;">Run Backtest</button>
+                <div id="ohlc-status" class="status-message"></div>
+            </div>
+
+            <div class="panel kpi-container" id="python-kpi-panel" style="display: none;">
+                <h2>🎯 Python vs Excel KPIs</h2>
+                <div id="python-kpis"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize theme
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            applyTheme(savedTheme);
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            applyTheme(newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        function applyTheme(theme) {
+            const html = document.documentElement;
+            const button = document.querySelector('.theme-toggle');
+
+            if (theme === 'dark') {
+                html.setAttribute('data-theme', 'dark');
+                button.textContent = '☀️ Light';
+            } else {
+                html.removeAttribute('data-theme');
+                button.textContent = '🌙 Dark';
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', initTheme);
+
+        let pineScript = null;
+        let pythonScript = null;
+        let pythonExcelFile = null;
+        let pythonParameters = null;
+        let ohlcFileContent = null;
+        let ohlcFileName = null;
+        let excelKPIs = null;
+
+        function showStatus(elementId, message, type = 'info') {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = `status-message ${type}`;
+        }
+
+        function uploadPineScript() {
+            const file = document.getElementById('pine-file').files[0];
+            if (!file) {
+                showStatus('pine-status', '❌ Please select a file', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showStatus('pine-status', '🔄 Uploading...', 'info');
+
+            fetch('/api/upload-strategy', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success || data.parameters) {
+                        pineScript = data;
+                        showStatus('pine-status', `✅ ${file.name}`, 'success');
+                    } else {
+                        showStatus('pine-status', `❌ ${data.error}`, 'error');
+                    }
+                })
+                .catch(e => showStatus('pine-status', `❌ Error: ${e}`, 'error'));
+        }
+
+        function uploadExcelFile() {
+            const file = document.getElementById('excel-file').files[0];
+            if (!file) {
+                showStatus('excel-status', '❌ Please select a file', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showStatus('excel-status', '🔄 Analyzing...', 'info');
+
+            fetch('/api/upload-excel', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showStatus('excel-status', `✅ Loaded`, 'success');
+                        // Now get KPIs
+                        getExcelKPIs(file.name);
+                    } else {
+                        showStatus('excel-status', `❌ ${data.error}`, 'error');
+                    }
+                })
+                .catch(e => showStatus('excel-status', `❌ Error: ${e}`, 'error'));
+        }
+
+        function getExcelKPIs(filename) {
+            fetch('/api/reconcile-kpis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ excel_file: filename })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        excelKPIs = data.kpis;
+                        displayExcelKPIs(data.kpis);
+                    }
+                })
+                .catch(e => console.error('Error:', e));
+        }
+
+        function displayExcelKPIs(kpis) {
+            const container = document.getElementById('excel-kpis');
+            const panel = document.getElementById('excel-kpi-panel');
+
+            let html = '<table class="kpi-table"><thead><tr><th>KPI</th><th>TradingView Value</th><th>Status</th></tr></thead><tbody>';
+
+            // Enforce correct KPI order
+            const kpiOrder = ['total_trades', 'winning_trades', 'losing_trades', 'win_rate',
+                            'max_profit', 'max_loss', 'total_pnl', 'max_drawdown_cc',
+                            'max_drawdown_intrabar', 'profit_factor'];
+
+            for (const name of kpiOrder) {
+                const data = kpis[name];
+                if (!data) continue;
+
+                const status = data.match ? 'match' : 'mismatch';
+                const statusIcon = data.match ? '✅ Match' : '⚠️ Mismatch';
+                const displayName = name.toUpperCase().replace(/_/g, ' ');
+
+                html += `
+                    <tr>
+                        <td class="kpi-name">${displayName}</td>
+                        <td class="kpi-value-cell">${data.excel}</td>
+                        <td class="match-status ${status}">${statusIcon}</td>
+                    </tr>
+                `;
+            }
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            panel.style.display = 'block';
+        }
+
+        function uploadPythonFile() {
+            const file = document.getElementById('python-file').files[0];
+            if (!file) {
+                showStatus('python-status', '❌ Please select a file', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                pythonScript = e.target.result;
+                showStatus('python-status', `✅ ${file.name}`, 'success');
+            };
+            reader.readAsText(file);
+        }
+
+        function uploadPythonExcelFile() {
+            const file = document.getElementById('python-excel-file').files[0];
+            if (!file) {
+                showStatus('python-excel-status', '❌ Please select a file', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showStatus('python-excel-status', '🔄 Extracting parameters...', 'info');
+
+            fetch('/api/extract-excel-parameters', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    console.log('📡 API Response:', data);
+                    if (data.success) {
+                        pythonExcelFile = file.name;
+                        pythonParameters = data.parameters;
+                        console.log('1️⃣ After assignment pythonParameters:', pythonParameters);
+                        console.log('2️⃣ pythonParameters keys:', Object.keys(pythonParameters));
+                        console.log('3️⃣ pythonParameters length:', Object.keys(pythonParameters).length);
+                        showStatus('python-excel-status', `✅ Parameters extracted (${Object.keys(data.parameters).length} settings)`, 'success');
+                    } else {
+                        showStatus('python-excel-status', `❌ ${data.error}`, 'error');
+                    }
+                })
+                .catch(e => {
+                    console.error('Error extracting parameters:', e);
+                    showStatus('python-excel-status', `❌ Error: ${e}`, 'error');
+                });
+        }
+
+        function uploadOHLCFile() {
+            const file = document.getElementById('ohlc-file').files[0];
+            if (!file) {
+                showStatus('ohlc-status', '❌ Please select a file', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                ohlcFileContent = e.target.result;
+                ohlcFileName = file.name;
+                showStatus('ohlc-status', `✅ ${file.name}`, 'success');
+            };
+            reader.readAsText(file);
+        }
+
+        function runPythonBacktest() {
+            console.log('🔍 runPythonBacktest called');
+            console.log('   pythonScript available:', !!pythonScript);
+            console.log('   pythonParameters value:', pythonParameters);
+            console.log('   pythonParameters type:', typeof pythonParameters);
+            console.log('   pythonParameters keys:', pythonParameters ? Object.keys(pythonParameters) : 'N/A');
+
+            if (!pythonScript) {
+                showStatus('ohlc-status', '❌ Upload Python code first', 'error');
+                return;
+            }
+
+            if (!pythonParameters || Object.keys(pythonParameters).length === 0) {
+                console.error('❌ pythonParameters is empty!');
+                showStatus('ohlc-status', '❌ Upload Excel file to extract parameters first', 'error');
+                return;
+            }
+
+            if (!ohlcFileContent) {
+                showStatus('ohlc-status', '❌ Upload OHLC CSV file', 'error');
+                return;
+            }
+
+            showStatus('ohlc-status', '🔄 Running backtest...', 'info');
+
+            const payload = {
+                python_code: pythonScript,
+                ohlc_content: ohlcFileContent,
+                ohlc_filename: ohlcFileName,
+                parameters: pythonParameters
+            };
+
+            console.log('📤 Sending to API:', {
+                python_code_length: pythonScript.length,
+                ohlc_content_length: ohlcFileContent.length,
+                ohlc_filename: ohlcFileName,
+                parameters_keys: Object.keys(pythonParameters),
+                parameters: pythonParameters
+            });
+
+            fetch('/api/backtest-kpis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(r => r.json())
+                .then(data => {
+                    console.log('📥 Response:', data);
+                    if (data.success) {
+                        showStatus('ohlc-status', `✅ ${data.summary}`, 'success');
+                        displayPythonKPIs(data.kpis);
+                    } else {
+                        showStatus('ohlc-status', `❌ ${data.error}`, 'error');
+                    }
+                })
+                .catch(e => {
+                    console.error('Error:', e);
+                    showStatus('ohlc-status', `❌ Error: ${e}`, 'error');
+                });
+        }
+
+        function displayPythonKPIs(kpis) {
+            const container = document.getElementById('python-kpis');
+            const panel = document.getElementById('python-kpi-panel');
+
+            let html = '<table class="kpi-table"><thead><tr><th>KPI</th><th>Python</th><th>TradingView</th><th>Status</th></tr></thead><tbody>';
+
+            // Enforce correct KPI order
+            const kpiOrder = ['total_trades', 'winning_trades', 'losing_trades', 'win_rate',
+                            'max_profit', 'max_loss', 'total_pnl', 'max_drawdown_cc',
+                            'max_drawdown_intrabar', 'profit_factor'];
+
+            for (const name of kpiOrder) {
+                const data = kpis[name];
+                if (!data) continue;
+
+                const displayName = name.toUpperCase().replace(/_/g, ' ');
+                const excelData = excelKPIs ? excelKPIs[name] : null;
+                const match = excelData && Math.abs(parseFloat(data.calculated) - parseFloat(excelData.calculated)) < 1;
+                const statusIcon = match ? '✅ Match' : '⚠️ Diff';
+                const status = match ? 'match' : 'mismatch';
+                const excelValue = excelData ? excelData.calculated : 'N/A';
+
+                html += `
+                    <tr>
+                        <td class="kpi-name">${displayName}</td>
+                        <td class="kpi-value-cell">${data.calculated}</td>
+                        <td class="kpi-value-cell">${excelValue}</td>
+                        <td class="match-status ${status}">${statusIcon}</td>
+                    </tr>
+                `;
+            }
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            panel.style.display = 'block';
+        }
+
+    </script>
+</body>
+</html>

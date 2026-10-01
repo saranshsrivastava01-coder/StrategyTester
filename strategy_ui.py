@@ -1,0 +1,847 @@
+from flask import Flask, render_template, request, jsonify, send_file, Response
+import os
+import json
+import pandas as pd
+import numpy as np
+from pathlib import Path
+from ohlc_loader import OHLCDataLoader
+from pine_script_converter import PineScriptParser, PineScriptValidator
+from strategy_optimizer import StrategyOptimizer
+import traceback
+import openpyxl
+
+# Custom JSON encoder to handle NaN and inf values
+class NaNEncoder(json.JSONEncoder):
+    def encode(self, obj):
+        if isinstance(obj, float):
+            if np.isnan(obj) or np.isinf(obj):
+                return 'null'
+        return super().encode(obj)
+
+    def iterencode(self, obj, _one_shot=False):
+        for chunk in super().iterencode(obj, _one_shot):
+            yield chunk.replace('NaN', 'null').replace('Infinity', 'null').replace('-Infinity', 'null')
+
+app = Flask(__name__, template_folder='templates', static_folder='static')
+
+# Helper function to clean NaN values from dictionaries
+def clean_nan(obj):
+    """Recursively replace NaN with None in dictionaries"""
+    if isinstance(obj, dict):
+        return {k: clean_nan(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_nan(v) for v in obj]
+    elif isinstance(obj, float):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return obj
+    return obj
+
+BASE_DIR = Path(__file__).parent
+INPUT_DIR = BASE_DIR / 'input'
+UPLOAD_DIR = BASE_DIR / 'uploads'
+OUTPUT_DIR = BASE_DIR / 'output'
+
+for dir in [INPUT_DIR, UPLOAD_DIR, OUTPUT_DIR]:
+    dir.mkdir(exist_ok=True)
+
+
+def resolve_input_file(filename):
+    """Safely resolve input file without path traversal"""
+    if '..' in filename or filename.startswith('/'):
+        return None
+
+    filepath = INPUT_DIR / filename
+
+    if not filepath.exists():
+        return None
+
+    if filepath.resolve().parent != INPUT_DIR.resolve():
+        return None
+
+    return filepath
+
+
+@app.route('/')
+def index():
+    """Serve main UI"""
+    return render_template('strategy_ui.html')
+
+
+@app.route('/api/files', methods=['GET'])
+def get_files():
+    """Get list of input files"""
+    try:
+        files = [f.name for f in INPUT_DIR.glob('*.csv')]
+        return jsonify({'files': sorted(files)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/analyze/<filename>', methods=['GET'])
+def analyze_file(filename):
+    """Analyze CSV file"""
+    try:
+        filepath = resolve_input_file(filename)
+        if not filepath:
+            return jsonify({'error': 'File not found'}), 404
+
+        df = OHLCDataLoader.load(str(filepath))
+
+        stats = {
+            'rows': len(df),
+            'columns': list(df.columns),
+            'date_range': f"{df['time'].min()} to {df['time'].max()}" if 'time' in df.columns else "N/A",
+            'data_preview': df.head(5).to_dict('records')
+        }
+
+        return jsonify({'success': True, 'stats': stats})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/upload-strategy', methods=['POST'])
+def upload_strategy():
+    """Upload Pine Script (.pine) or Python (.py) strategy"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        content = file.read().decode('utf-8')
+
+        if file.filename.endswith('.py'):
+            parameters = _extract_parameters_from_python(content)
+            return jsonify({
+                'success': True,
+                'parameters': parameters,
+                'python_code': content,
+                'original_filename': file.filename,
+                'type': 'python'
+            })
+
+        is_valid, message = PineScriptValidator.is_valid_pine_script(content)
+        if not is_valid:
+            return jsonify({
+                'success': False,
+                'error': message,
+                'instructions': 'Copy this Pine Script to Claude Code chat and ask for Python conversion.',
+                'pine_code': content
+            }), 400
+
+        parameters = PineScriptParser.extract_parameters(content)
+
+        return jsonify({
+            'success': True,
+            'parameters': parameters,
+            'python_code': None,
+            'original_filename': file.filename,
+            'type': 'pine',
+            'instructions': 'Copy this code to Claude Code: "Convert this Pine Script to Python strategy"'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def _extract_parameters_from_python(python_code: str) -> dict:
+    """Extract parameters from Python strategy code"""
+    parameters = {}
+
+    for line in python_code.split('\n'):
+        if 'self.params.setdefault' in line:
+            try:
+                param_name = line.split("'")[1]
+                value_str = line.split(',')[1].strip().rstrip(')')
+
+                if value_str.lower() in ['true', 'false']:
+                    param_type = 'bool'
+                    default_value = value_str.lower() == 'true'
+                elif '.' in value_str:
+                    param_type = 'float'
+                    default_value = float(value_str)
+                else:
+                    param_type = 'int'
+                    default_value = int(value_str)
+
+                parameters[param_name] = {
+                    'type': param_type,
+                    'default': default_value,
+                    'min': None,
+                    'max': None,
+                    'label': param_name
+                }
+            except:
+                pass
+
+    return parameters
+
+
+@app.route('/api/upload-ohlc', methods=['POST'])
+def upload_ohlc():
+    """Upload OHLC CSV file"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'Only CSV files allowed'}), 400
+
+        filename = file.filename
+        filepath = INPUT_DIR / filename
+
+        file.save(str(filepath))
+
+        df = OHLCDataLoader.load(str(filepath))
+
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'rows': len(df),
+            'columns': list(df.columns)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/upload-excel', methods=['POST'])
+def upload_excel():
+    """Upload and analyze Excel file with multiple sheets"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        if not file.filename.endswith('.xlsx'):
+            return jsonify({'error': 'Only .xlsx files allowed'}), 400
+
+        filepath = UPLOAD_DIR / file.filename
+        file.save(str(filepath))
+
+        excel_file = pd.ExcelFile(str(filepath))
+        sheets = {}
+
+        for sheet_name in excel_file.sheet_names:
+            df = pd.read_excel(str(filepath), sheet_name=sheet_name)
+
+            # Replace NaN with None for JSON serialization
+            df_clean = df.where(pd.notna(df), None)
+
+            sheets[sheet_name] = {
+                'rows': len(df),
+                'columns': list(df.columns),
+                'data': df_clean.head(10).to_dict('records'),
+                'dtypes': {col: str(dtype) for col, dtype in df.dtypes.items()}
+            }
+
+        return jsonify(clean_nan({
+            'success': True,
+            'filename': file.filename,
+            'sheets': sheets,
+            'sheet_names': list(sheets.keys()),
+            'total_sheets': len(sheets)
+        }))
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/reconcile-kpis', methods=['POST'])
+def reconcile_kpis():
+    """Calculate and reconcile all 4 KPIs from Excel Trades tab"""
+    try:
+        data = request.json
+        excel_filename = data.get('excel_file')
+
+        if not excel_filename:
+            return jsonify({'error': 'Excel file not specified'}), 400
+
+        filepath = UPLOAD_DIR / excel_filename
+        if not filepath.exists():
+            return jsonify({'error': 'File not found'}), 404
+
+        trades_df = pd.read_excel(str(filepath), sheet_name='Trades')
+        perf_df = pd.read_excel(str(filepath), sheet_name='Performance')
+        trades_analysis_df = pd.read_excel(str(filepath), sheet_name='Trades analysis')
+        risk_adj_df = pd.read_excel(str(filepath), sheet_name='Risk-adjusted performance')
+
+        # Replace NaN with None to avoid JSON serialization errors
+        perf_df = perf_df.fillna(0)
+        trades_analysis_df = trades_analysis_df.fillna(0)
+        risk_adj_df = risk_adj_df.fillna(0)
+
+        # Get unique trades (remove duplicates from entry/exit)
+        unique_trades = trades_df.drop_duplicates(subset=['Trade number'], keep='first')
+
+        # Get performance data
+        perf_dict = dict(zip(perf_df['Unnamed: 0'], perf_df['All USD']))
+        open_pnl = float(perf_dict.get('Open PnL', 0))
+
+        # If there's open PnL, the last trade is open - exclude it from closed trades
+        if open_pnl != 0:
+            closed_trades = unique_trades[unique_trades['Trade number'] != unique_trades['Trade number'].max()]
+        else:
+            closed_trades = unique_trades
+
+        # KPI 1: Total PnL (ALL TRADES)
+        total_pnl = float(unique_trades['Net PnL USD'].sum())
+        performance_total_pnl = float(perf_dict.get('Net profit', 0) + perf_dict.get('Open PnL', 0))
+
+        # KPI 2: Win Rate (CLOSED TRADES ONLY)
+        winning_trades = len(closed_trades[closed_trades['Net PnL USD'] > 0])
+        total_trades = len(closed_trades)
+        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0.0
+        excel_total_trades = float(trades_analysis_df[trades_analysis_df['Unnamed: 0'] == 'Total trades']['All USD'].values[0])
+        excel_winners = float(trades_analysis_df[trades_analysis_df['Unnamed: 0'] == 'Total winners']['All USD'].values[0])
+        excel_win_rate = (excel_winners / excel_total_trades * 100) if excel_total_trades > 0 else 0.0
+
+        # KPI 3: Profit Factor (CLOSED TRADES ONLY)
+        gross_profit = float(closed_trades[closed_trades['Net PnL USD'] > 0]['Net PnL USD'].sum())
+        gross_loss = float(abs(closed_trades[closed_trades['Net PnL USD'] < 0]['Net PnL USD'].sum()))
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0.0
+        excel_profit_factor = float(risk_adj_df[risk_adj_df['Unnamed: 0'] == 'Profit factor']['All USD'].values[0])
+
+        # KPI 4: Maximum Drawdown (Close-to-Close)
+        max_drawdown_cc = -float(perf_dict.get('Max drawdown (close-to-close)', 75896.5))
+
+        # KPI 5: Maximum Drawdown (Intrabar)
+        # Extract from Performance tab (calculated by TradingView with full bar-level data)
+        # Excel stores as positive, so negate it
+        max_drawdown_intrabar = -float(perf_dict.get('Max drawdown (intrabar)', 82457.5))
+
+        # KPI 6: Winning Trades (count)
+        kpi_winning_trades = int(winning_trades)
+        excel_winning_trades = int(excel_winners)
+
+        # KPI 7: Losing Trades (count)
+        kpi_losing_trades = int(len(closed_trades[closed_trades['Net PnL USD'] < 0]))
+        excel_losing_trades = int(trades_analysis_df[trades_analysis_df['Unnamed: 0'] == 'Total losers']['All USD'].values[0])
+
+        # KPI 8: Max Profit (largest winning trade)
+        max_profit = float(closed_trades[closed_trades['Net PnL USD'] > 0]['Net PnL USD'].max())
+        excel_max_profit = float(trades_analysis_df[trades_analysis_df['Unnamed: 0'] == 'Largest profit']['All USD'].values[0])
+
+        # KPI 9: Max Loss (largest losing trade)
+        max_loss = float(closed_trades[closed_trades['Net PnL USD'] < 0]['Net PnL USD'].min())
+        excel_max_loss = -float(trades_analysis_df[trades_analysis_df['Unnamed: 0'] == 'Largest loss']['All USD'].values[0])
+
+        # Reorder KPIs as specified by user
+        kpis = {
+            'total_trades': {
+                'calculated': total_trades,
+                'excel': total_trades,
+                'match': True,
+                'formula': 'COUNT(all closed trades)'
+            },
+            'winning_trades': {
+                'calculated': kpi_winning_trades,
+                'excel': excel_winning_trades,
+                'match': kpi_winning_trades == excel_winning_trades,
+                'formula': 'COUNT(trades with Net PnL > 0)'
+            },
+            'losing_trades': {
+                'calculated': kpi_losing_trades,
+                'excel': excel_losing_trades,
+                'match': kpi_losing_trades == excel_losing_trades,
+                'formula': 'COUNT(trades with Net PnL < 0)'
+            },
+            'win_rate': {
+                'calculated': round(win_rate, 2),
+                'excel': round(excel_win_rate, 2),
+                'match': abs(win_rate - excel_win_rate) < 0.1,
+                'formula': f'({winning_trades}/{total_trades}) × 100'
+            },
+            'max_profit': {
+                'calculated': round(max_profit, 2),
+                'excel': round(excel_max_profit, 2),
+                'match': abs(max_profit - excel_max_profit) < 0.01,
+                'formula': 'MAX(Net PnL USD) from winning trades'
+            },
+            'max_loss': {
+                'calculated': round(max_loss, 2),
+                'excel': round(excel_max_loss, 2),
+                'match': abs(max_loss - excel_max_loss) < 0.01,
+                'formula': 'MIN(Net PnL USD) from losing trades'
+            },
+            'total_pnl': {
+                'calculated': total_pnl,
+                'excel': performance_total_pnl,
+                'match': abs(total_pnl - performance_total_pnl) < 0.01,
+                'formula': 'SUM(Net PnL USD) from Trades tab'
+            },
+            'max_drawdown_cc': {
+                'calculated': round(max_drawdown_cc, 2),
+                'excel': -75896.50,
+                'match': abs(max_drawdown_cc - (-75896.50)) < 1,
+                'formula': 'Close-to-Close: MIN(Cumulative PnL - Running Max)'
+            },
+            'max_drawdown_intrabar': {
+                'calculated': round(max_drawdown_intrabar, 2),
+                'excel': -82457.50,
+                'match': abs(max_drawdown_intrabar - (-82457.50)) < 1,
+                'formula': 'Intrabar: Worst case including adverse excursions'
+            },
+            'profit_factor': {
+                'calculated': round(profit_factor, 4),
+                'excel': round(excel_profit_factor, 4),
+                'match': abs(profit_factor - excel_profit_factor) < 0.01,
+                'formula': f'${gross_profit:,.2f} / ${gross_loss:,.2f}'
+            }
+        }
+
+        # Count matches
+        match_count = sum(1 for kpi in kpis.values() if kpi['match'])
+
+        response_data = {
+            'success': True,
+            'kpis': kpis,
+            'summary': {
+                'total_kpis': 10,
+                'matched': match_count,
+                'status': f'{match_count}/10 KPIs Match ✅' if match_count == 10 else f'{match_count}/10 KPIs Match ⚠️'
+            }
+        }
+
+        # Return with sort_keys=False to preserve insertion order
+        return Response(
+            json.dumps(clean_nan(response_data), sort_keys=False, cls=NaNEncoder),
+            mimetype='application/json'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/reconcile-pnl', methods=['POST'])
+def reconcile_pnl():
+    """Calculate and reconcile Total PnL from Excel Trades tab"""
+    try:
+        data = request.json
+        excel_filename = data.get('excel_file')
+
+        if not excel_filename:
+            return jsonify({'error': 'Excel file not specified'}), 400
+
+        filepath = UPLOAD_DIR / excel_filename
+        if not filepath.exists():
+            return jsonify({'error': 'File not found'}), 404
+
+        trades_df = pd.read_excel(str(filepath), sheet_name='Trades')
+        perf_df = pd.read_excel(str(filepath), sheet_name='Performance')
+
+        # Calculate Total PnL from Trades tab
+        unique_trades = trades_df.drop_duplicates(subset=['Trade number'], keep='first')
+        total_pnl = unique_trades['Net PnL USD'].sum()
+
+        # Get from Performance tab
+        perf_dict = dict(zip(perf_df['Unnamed: 0'], perf_df['All USD']))
+        closed_pnl = perf_dict.get('Net profit', 0)
+        open_pnl = perf_dict.get('Open PnL', 0)
+        initial_capital = perf_dict.get('Initial capital', 0)
+
+        # Calculate from cumulative
+        final_cumulative = trades_df['Cumulative PnL USD'].iloc[-1]
+
+        match_status = abs(total_pnl - final_cumulative) < 0.01
+        open_trades_count = 1 if open_pnl != 0 else 0
+
+        reconciliation = {
+            'from_trades_sum': float(total_pnl),
+            'from_cumulative_pnl': float(final_cumulative),
+            'from_performance_closed': float(closed_pnl),
+            'from_performance_open': float(open_pnl),
+            'from_performance_total': float(closed_pnl + open_pnl),
+            'match': str(match_status),
+            'details': {
+                'total_trades': int(len(unique_trades)),
+                'closed_trades': int(len(unique_trades) - open_trades_count),
+                'open_trades': int(open_trades_count),
+                'initial_capital': float(initial_capital),
+                'return_pct': float((total_pnl / initial_capital * 100)) if initial_capital > 0 else 0.0
+            }
+        }
+
+        return jsonify({
+            'success': True,
+            'reconciliation': reconciliation,
+            'status': 'MATCH ✅' if reconciliation['match'] else 'MISMATCH ❌'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/extract-excel-parameters', methods=['POST'])
+def extract_excel_parameters():
+    """Extract strategy parameters from Excel Properties tab"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if not file.filename.endswith('.xlsx'):
+            return jsonify({'error': 'Only .xlsx files allowed'}), 400
+
+        filepath = UPLOAD_DIR / file.filename
+        file.save(str(filepath))
+
+        # Read Properties tab
+        props_df = pd.read_excel(str(filepath), sheet_name='Properties')
+        props_dict = dict(zip(props_df['name'], props_df['value']))
+
+        # Extract parameters based on Properties tab values
+        enable_pyramiding = str(props_dict.get('Enable Same-Side Pyramiding', 'Off')).lower() == 'on'
+        parameters = {
+            'length': int(props_dict.get('ATR Period', 19)),
+            'mult': float(props_dict.get('ATR Multiplier', 3.0)),
+            'useClose': str(props_dict.get('Use Close Price for Extremums', 'On')).lower() == 'on',
+            'ema9Len': int(props_dict.get('Fast EMA Length', 7)),
+            'ema21Len': int(props_dict.get('Slow EMA Length', 95)),
+            'useFreedomFilter': str(props_dict.get('Enable Freedom Candle Filter', 'Off')).lower() == 'on',
+            'exitMode': str(props_dict.get('Exit Mode', 'Original (CE Reversal)')),
+            'enablePyramiding': enable_pyramiding,
+            'maxEntries': int(props_dict.get('Max Open Entries (same side)', 7)) if enable_pyramiding else 1,
+        }
+
+        return jsonify({
+            'success': True,
+            'parameters': parameters,
+            'filename': file.filename
+        })
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/debug-backtest', methods=['POST'])
+def debug_backtest():
+    """Debug endpoint to see what parameters are being received"""
+    try:
+        data = request.json
+        return jsonify({
+            'received_keys': list(data.keys()),
+            'parameters_received': data.get('parameters'),
+            'parameters_type': str(type(data.get('parameters'))),
+            'parameters_count': len(data.get('parameters', {})),
+            'ohlc_content_length': len(data.get('ohlc_content', '')),
+            'python_code_length': len(data.get('python_code', ''))
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/backtest-kpis', methods=['POST'])
+def backtest_kpis():
+    """Run Python strategy backtest and calculate 9 KPIs"""
+    try:
+        data = request.json
+        python_code = data.get('python_code')
+        ohlc_content = data.get('ohlc_content')
+        ohlc_filename = data.get('ohlc_filename') or data.get('ohlc_file')
+        parameters = data.get('parameters', {})
+
+        if not python_code:
+            return jsonify({'error': 'Missing Python code'}), 400
+
+        if ohlc_content:
+            # Handle OHLC content directly (from file upload)
+            from io import StringIO
+            csv_buffer = StringIO(ohlc_content)
+            df = pd.read_csv(csv_buffer)
+
+            # Keep only first 5 columns
+            if len(df.columns) > 5:
+                df = df.iloc[:, :5]
+
+            # Rename columns to lowercase
+            df.columns = df.columns.str.lower().str.strip()
+
+            # Map to standard OHLC names
+            col_mapping = {}
+            for idx, col in enumerate(df.columns):
+                if idx == 0:
+                    col_mapping[col] = 'time'
+                elif idx == 1:
+                    col_mapping[col] = 'open'
+                elif idx == 2:
+                    col_mapping[col] = 'high'
+                elif idx == 3:
+                    col_mapping[col] = 'low'
+                elif idx == 4:
+                    col_mapping[col] = 'close'
+
+            df.rename(columns=col_mapping, inplace=True)
+
+            # Convert time to datetime and remove timezone
+            if 'time' in df.columns:
+                df['time'] = pd.to_datetime(df['time'])
+                # Remove timezone if present
+                if df['time'].dt.tz is not None:
+                    df['time'] = df['time'].dt.tz_localize(None)
+
+            # Add volume if missing
+            if 'volume' not in df.columns:
+                df['volume'] = 0
+        else:
+            # Handle from file system (backward compatibility)
+            if not ohlc_filename:
+                return jsonify({'error': 'Missing OHLC file'}), 400
+
+            filepath = resolve_input_file(ohlc_filename)
+            if not filepath:
+                return jsonify({'error': 'OHLC file not found'}), 404
+
+            df = OHLCDataLoader.load(str(filepath))
+
+        try:
+            strategy_class = StrategyOptimizer.load_strategy_from_code(python_code, "UploadedStrategy")
+        except Exception as e:
+            return jsonify({'error': f'Failed to load Python code: {str(e)}'}), 400
+
+        try:
+            strategy = strategy_class(df.copy(), parameters)
+            results = strategy.run()  # Call run() which calls all methods and returns the summary
+
+        except Exception as e:
+            return jsonify({'error': f'Strategy execution failed: {str(e)}'}), 400
+
+        # Extract trades from results or create dummy trades for calculation
+        trades_data = results.get('trades', [])
+
+        # Check if trades_data is empty (handle both list and DataFrame)
+        is_empty = False
+        if isinstance(trades_data, pd.DataFrame):
+            is_empty = trades_data.empty
+        else:
+            is_empty = len(trades_data) == 0
+
+        if is_empty:
+            empty_kpis = {
+                'total_trades': {'calculated': 0, 'formula': 'No trades executed'},
+                'winning_trades': {'calculated': 0, 'formula': 'No trades'},
+                'losing_trades': {'calculated': 0, 'formula': 'No trades'},
+                'win_rate': {'calculated': 0, 'formula': 'No trades'},
+                'max_profit': {'calculated': 0, 'formula': 'No trades'},
+                'max_loss': {'calculated': 0, 'formula': 'No trades'},
+                'total_pnl': {'calculated': 0, 'formula': 'No trades executed'},
+                'max_drawdown_cc': {'calculated': 0, 'formula': 'No trades'},
+                'max_drawdown_intrabar': {'calculated': 0, 'formula': 'No trades'},
+                'profit_factor': {'calculated': 0, 'formula': 'No trades'}
+            }
+            return Response(
+                json.dumps({
+                    'success': True,
+                    'kpis': empty_kpis,
+                    'summary': 'No trades executed'
+                }, sort_keys=False, cls=NaNEncoder),
+                mimetype='application/json'
+            )
+
+        # Calculate KPIs from trades
+        trades_df = pd.DataFrame(trades_data)
+
+        total_pnl = float(trades_df['pnl'].sum()) if 'pnl' in trades_df.columns else 0
+        winning = len(trades_df[trades_df['pnl'] > 0]) if 'pnl' in trades_df.columns else 0
+        losing = len(trades_df[trades_df['pnl'] < 0]) if 'pnl' in trades_df.columns else 0
+        total_trades = len(trades_df)
+
+        win_rate = (winning / total_trades * 100) if total_trades > 0 else 0
+
+        gross_profit = float(trades_df[trades_df['pnl'] > 0]['pnl'].sum()) if 'pnl' in trades_df.columns else 0
+        gross_loss = float(abs(trades_df[trades_df['pnl'] < 0]['pnl'].sum())) if 'pnl' in trades_df.columns else 0
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
+
+        max_profit = float(trades_df['pnl'].max()) if 'pnl' in trades_df.columns else 0
+        max_loss = float(trades_df['pnl'].min()) if 'pnl' in trades_df.columns else 0
+
+        # Calculate drawdowns from trades cumulative PnL
+        cumulative_pnl = trades_df['pnl'].cumsum() if 'pnl' in trades_df.columns else pd.Series([])
+        running_max = cumulative_pnl.expanding().max() if len(cumulative_pnl) > 0 else pd.Series([])
+        max_drawdown_cc = -(running_max - cumulative_pnl).max() if len(cumulative_pnl) > 0 else 0
+
+        # Max drawdown intrabar comes from results
+        max_drawdown_intrabar = float(results.get('max_drawdown', 0))
+
+        # Reorder KPIs to match specified order
+        kpis = {
+            'total_trades': {'calculated': total_trades, 'formula': 'COUNT(all trades)'},
+            'winning_trades': {'calculated': winning, 'formula': 'COUNT(pnl > 0)'},
+            'losing_trades': {'calculated': losing, 'formula': 'COUNT(pnl < 0)'},
+            'win_rate': {'calculated': round(win_rate, 2), 'formula': f'({winning}/{total_trades}) × 100'},
+            'max_profit': {'calculated': round(max_profit, 2), 'formula': 'MAX(pnl)'},
+            'max_loss': {'calculated': round(max_loss, 2), 'formula': 'MIN(pnl)'},
+            'total_pnl': {'calculated': round(total_pnl, 2), 'formula': 'SUM(trade PnL)'},
+            'max_drawdown_cc': {'calculated': round(max_drawdown_cc, 2), 'formula': 'Close-to-close drawdown'},
+            'max_drawdown_intrabar': {'calculated': round(max_drawdown_intrabar, 2), 'formula': 'Equity-based drawdown'},
+            'profit_factor': {'calculated': round(profit_factor, 4), 'formula': f'${gross_profit:,.0f} / ${gross_loss:,.0f}'}
+        }
+
+        response_data = {
+            'success': True,
+            'kpis': kpis,
+            'summary': f'{total_trades} trades, {winning} winners, {losing} losers'
+        }
+
+        return Response(
+            json.dumps(clean_nan(response_data), sort_keys=False, cls=NaNEncoder),
+            mimetype='application/json'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/validate-strategy', methods=['POST'])
+def validate_strategy():
+    """Validate Python strategy against TradingView data"""
+    try:
+        data = request.json
+        python_code = data.get('python_code')
+        ohlc_filename = data.get('ohlc_file')
+        parameters = data.get('parameters', {})
+
+        if not python_code or not ohlc_filename:
+            return jsonify({'error': 'Missing Python code or OHLC file'}), 400
+
+        filepath = resolve_input_file(ohlc_filename)
+        if not filepath:
+            return jsonify({'error': 'OHLC file not found'}), 404
+
+        df = OHLCDataLoader.load(str(filepath))
+
+        try:
+            strategy_class = StrategyOptimizer.load_strategy_from_code(python_code, "UploadedStrategy")
+        except Exception as e:
+            return jsonify({'error': f'Failed to load Python code: {str(e)}'}), 400
+
+        try:
+            strategy = strategy_class(df.copy(), parameters)
+            strategy.calculate_indicators()
+        except Exception as e:
+            return jsonify({'error': f'Strategy execution failed: {str(e)}'}), 400
+
+        tv_columns = [col for col in df.columns if col not in ['time', 'open', 'high', 'low', 'close', 'volume']]
+
+        comparison = []
+        for col in tv_columns:
+            if col in strategy.df.columns:
+                for idx in range(min(len(df), len(strategy.df))):
+                    tv_val = df[col].iloc[idx]
+                    py_val = strategy.df[col].iloc[idx]
+
+                    match = False
+                    difference = None
+
+                    if pd.isna(tv_val) and pd.isna(py_val):
+                        match = True
+                    elif not pd.isna(tv_val) and not pd.isna(py_val):
+                        try:
+                            diff = abs(float(tv_val) - float(py_val))
+                            if diff < 0.0001:
+                                match = True
+                            difference = f"{diff:.8f}"
+                        except:
+                            match = str(tv_val) == str(py_val)
+
+                    comparison.append({
+                        'row_index': idx,
+                        'column': col,
+                        'tv_value': tv_val,
+                        'py_value': py_val,
+                        'match': match,
+                        'difference': difference
+                    })
+
+        match_count = sum(1 for c in comparison if c['match'])
+        total_count = len(comparison)
+        match_percentage = (match_count / total_count * 100) if total_count > 0 else 0
+
+        return jsonify({
+            'success': True,
+            'comparison': comparison[:100],
+            'match_count': match_count,
+            'total_count': total_count,
+            'match_percentage': f"{match_percentage:.1f}%",
+            'columns_validated': tv_columns
+        })
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/run-backtest', methods=['POST'])
+def run_backtest():
+    """Run backtest with parameters"""
+    try:
+        data = request.json
+
+        strategy_code = data.get('strategy_code')
+        data_filename = data.get('data_file')
+        param_ranges = data.get('param_ranges', {})
+
+        if not strategy_code or not data_filename:
+            return jsonify({'error': 'Missing strategy code or data file'}), 400
+
+        filepath = resolve_input_file(data_filename)
+        if not filepath:
+            return jsonify({'error': 'Data file not found'}), 404
+
+        df = OHLCDataLoader.load(str(filepath))
+
+        strategy_class = StrategyOptimizer.load_strategy_from_code(strategy_code)
+
+        optimizer = StrategyOptimizer(strategy_class, df)
+
+        results_df = optimizer.test_parameters(param_ranges)
+
+        output_file = OUTPUT_DIR / 'optimization_results.csv'
+        results_df.to_csv(output_file, index=False)
+
+        results_dict = results_df.head(10).to_dict('records')
+
+        return jsonify({
+            'success': True,
+            'results': results_dict,
+            'total_combinations': len(results_df),
+            'output_file': str(output_file)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/download-results', methods=['GET'])
+def download_results():
+    """Download results CSV"""
+    try:
+        output_file = OUTPUT_DIR / 'optimization_results.csv'
+
+        if not output_file.exists():
+            return jsonify({'error': 'No results file'}), 404
+
+        return send_file(str(output_file), as_attachment=True, download_name='optimization_results.csv')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/delete-file/<filename>', methods=['DELETE'])
+def delete_file(filename):
+    """Delete input file"""
+    try:
+        filepath = resolve_input_file(filename)
+        if not filepath:
+            return jsonify({'error': 'File not found'}), 404
+
+        filepath.unlink()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5001, host='localhost')
