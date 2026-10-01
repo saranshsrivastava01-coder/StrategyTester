@@ -665,7 +665,7 @@ def backtest_kpis():
         # Use max_drawdown from strategy results (calculated from actual equity curve)
         # This is the most accurate as it includes both trade PnL and floating P&L
         strategy_max_drawdown = float(results.get('max_drawdown', 0))
-        max_drawdown_cc = -strategy_max_drawdown  # Negate because strategy returns positive value
+        max_drawdown_cc = strategy_max_drawdown  # Strategy returns positive value, use as-is
 
         # For intrabar drawdown, use the same value from strategy (it uses equity curve)
         max_drawdown_intrabar = max_drawdown_cc
@@ -924,6 +924,180 @@ def extract_python_parameters():
         )
     except Exception as e:
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/bruteforce-test', methods=['POST'])
+def bruteforce_test():
+    """Run brute force parameter optimization"""
+    try:
+        data = request.json
+        python_code = data.get('python_code')
+        ohlc_content = data.get('ohlc_content')
+        parameter_configs = data.get('parameter_configs', {})
+
+        # Ensure Freedom filter is disabled to allow trades to execute
+        if 'useFreedomFilter' not in parameter_configs:
+            parameter_configs['useFreedomFilter'] = {
+                'from': False,
+                'to': False,
+                'default': False
+            }
+
+        if not python_code or not ohlc_content:
+            return jsonify({'error': 'Missing Python code or OHLC data'}), 400
+
+        # Load OHLC data
+        from io import StringIO
+        csv_buffer = StringIO(ohlc_content)
+        df = pd.read_csv(csv_buffer)
+
+        if len(df.columns) > 5:
+            df = df.iloc[:, :5]
+
+        df.columns = df.columns.str.lower().str.strip()
+
+        col_mapping = {}
+        for idx, col in enumerate(df.columns):
+            if idx == 0:
+                col_mapping[col] = 'time'
+            elif idx == 1:
+                col_mapping[col] = 'open'
+            elif idx == 2:
+                col_mapping[col] = 'high'
+            elif idx == 3:
+                col_mapping[col] = 'low'
+            elif idx == 4:
+                col_mapping[col] = 'close'
+
+        df.rename(columns=col_mapping, inplace=True)
+
+        if 'time' in df.columns:
+            df['time'] = pd.to_datetime(df['time'])
+            if df['time'].dt.tz is not None:
+                df['time'] = df['time'].dt.tz_localize(None)
+
+        if 'volume' not in df.columns:
+            df['volume'] = 0
+
+        # Load strategy
+        strategy_class = StrategyOptimizer.load_strategy_from_code(python_code, "UploadedStrategy")
+
+        # Execute code to get namespace with constants (for resolving parameter values)
+        namespace = {}
+        try:
+            exec(python_code, namespace)
+        except:
+            pass
+
+        # Generate parameter combinations
+        results = []
+        combinations = generate_parameter_combinations(parameter_configs)
+
+        for combo in combinations:
+            try:
+                # Resolve string values to proper types
+                resolved_combo = {}
+                for param_name, param_value in combo.items():
+                    if isinstance(param_value, str):
+                        # Try to convert string booleans
+                        if param_value == 'True' or param_value == 'true':
+                            resolved_combo[param_name] = True
+                        elif param_value == 'False' or param_value == 'false':
+                            resolved_combo[param_name] = False
+                        else:
+                            # Try to resolve as a constant from the namespace
+                            if param_value in namespace:
+                                resolved_combo[param_name] = namespace[param_value]
+                            else:
+                                resolved_combo[param_name] = param_value
+                    else:
+                        resolved_combo[param_name] = param_value
+
+                strategy = strategy_class(df.copy(), resolved_combo)
+                result = strategy.run()
+
+                # Convert trades DataFrame to list
+                trades_list = []
+                trades_data = result.get('trades', pd.DataFrame())
+                if isinstance(trades_data, pd.DataFrame) and not trades_data.empty:
+                    trades_list = trades_data.to_dict(orient='records')
+
+                # Calculate KPIs
+                trades_df = pd.DataFrame(trades_list)
+                total_trades = len(trades_df)
+                winning = len(trades_df[trades_df['pnl'] > 0]) if 'pnl' in trades_df.columns else 0
+                total_pnl = float(trades_df['pnl'].sum()) if 'pnl' in trades_df.columns else 0
+                profit_factor = 0
+
+                if total_trades > 0:
+                    gross_profit = float(trades_df[trades_df['pnl'] > 0]['pnl'].sum()) if 'pnl' in trades_df.columns else 0
+                    gross_loss = float(abs(trades_df[trades_df['pnl'] < 0]['pnl'].sum())) if 'pnl' in trades_df.columns else 0
+                    profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
+                    win_rate = (winning / total_trades * 100) if total_trades > 0 else 0
+                else:
+                    win_rate = 0
+
+                results.append({
+                    'parameters': resolved_combo,
+                    'total_trades': total_trades,
+                    'winning_trades': winning,
+                    'win_rate': win_rate,
+                    'total_pnl': total_pnl,
+                    'max_drawdown': float(result.get('max_drawdown', 0)),
+                    'profit_factor': profit_factor
+                })
+            except Exception as e:
+                # Log error but continue with other combinations
+                print(f"❌ Failed combination {combo}: {str(e)}", flush=True)
+                import traceback
+                traceback.print_exc()
+
+        # If no results, return error with context
+        if not results:
+            return jsonify({'error': 'No successful combinations. Check that parameters are valid and strategy can execute.', 'combinations_tested': len(combinations)}), 400
+
+        return Response(
+            json.dumps({'success': True, 'results': results}, sort_keys=False, cls=NaNEncoder),
+            mimetype='application/json'
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+def generate_parameter_combinations(parameter_configs):
+    """Generate all parameter combinations from config"""
+    import itertools
+
+    param_lists = {}
+    for param_name, config in parameter_configs.items():
+        from_val = config['from']
+        to_val = config['to']
+
+        # Skip parameters where from == to (no variation)
+        if from_val == to_val:
+            param_lists[param_name] = [from_val]
+            continue
+
+        if isinstance(from_val, (int, float)) and isinstance(to_val, (int, float)):
+            # Generate range of values
+            if isinstance(from_val, int) and isinstance(to_val, int):
+                param_lists[param_name] = list(range(int(from_val), int(to_val) + 1))
+            else:
+                param_lists[param_name] = [from_val, to_val]  # For now, just test from and to
+        else:
+            param_lists[param_name] = [from_val, to_val]
+
+    # Generate combinations
+    param_names = list(param_lists.keys())
+    param_values = list(param_lists.values())
+
+    combinations = []
+    for combo_values in itertools.product(*param_values):
+        combo_dict = dict(zip(param_names, combo_values))
+        combinations.append(combo_dict)
+
+    return combinations
 
 
 if __name__ == '__main__':

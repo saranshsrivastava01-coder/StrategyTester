@@ -369,6 +369,7 @@
         <div class="nav-tabs">
             <button class="nav-tab active" onclick="switchPage('reconciliation')">🎯 Reconciliation</button>
             <button class="nav-tab" onclick="switchPage('tester')">🧪 Strategy Tester</button>
+            <button class="nav-tab" onclick="switchPage('bruteforce')">⚡ Brute Force</button>
         </div>
     </div>
 
@@ -518,6 +519,58 @@
                 <p style="color: var(--text-secondary);">Trades will appear here after running backtest</p>
             </div>
         </div>
+    </div>
+
+    <!-- Brute Force Tester Page -->
+    <div id="bruteforce-page" class="page-content" style="padding: 20px; max-width: 1600px; margin: 0 auto;">
+        <div class="panel">
+            <h2>⚡ Brute Force Strategy Tester</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 20px;">Upload strategy and data, configure parameters, and run brute force testing</p>
+
+            <!-- File Uploads -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                <div class="form-group">
+                    <label>Upload Python Strategy (.py):</label>
+                    <input type="file" id="bruteforce-python" accept=".py">
+                </div>
+                <div class="form-group">
+                    <label>Upload OHLC Data (.csv):</label>
+                    <input type="file" id="bruteforce-ohlc" accept=".csv">
+                </div>
+            </div>
+        </div>
+
+        <!-- Parameter Configuration -->
+        <div class="panel">
+            <h2>⚙️ Parameter Configuration</h2>
+            <div id="bruteforce-params" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <p style="color: var(--text-secondary); grid-column: 1/-1;">Upload strategy file to extract parameters</p>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="panel">
+            <h2>📊 Results</h2>
+            <div id="bruteforce-results" style="max-height: 600px; overflow-y: auto;">
+                <p style="color: var(--text-secondary);">Results will appear here</p>
+            </div>
+        </div>
+
+        <button onclick="runBruteForceTest()" style="
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.2s;
+        " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+            🚀 Run Brute Force Test
+        </button>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1295,6 +1348,243 @@
                     <td style="text-align: right; color: ${lossColor};">
                         ${month.largestLoss < 0 ? '' : ''}${formatIndianNumber(month.largestLoss.toFixed(2))}
                     </td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // ===== BRUTE FORCE TESTER FUNCTIONS =====
+        let bruteForcePythonScript = null;
+        let bruteForceOHLCData = null;
+        let bruteForceParameters = {};
+
+        document.getElementById('bruteforce-python')?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                bruteForcePythonScript = await file.text();
+                extractBruteForceParameters();
+            }
+        });
+
+        document.getElementById('bruteforce-ohlc')?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                bruteForceOHLCData = await file.text();
+            }
+        });
+
+        function extractBruteForceParameters() {
+            if (!bruteForcePythonScript) return;
+
+            const container = document.getElementById('bruteforce-params');
+
+            // Extract parameters from Python code
+            const defaultParamsMatch = bruteForcePythonScript.match(/DEFAULT_PARAMS\s*=\s*\{([^}]+)\}/s);
+            if (!defaultParamsMatch) {
+                container.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1/-1;">No DEFAULT_PARAMS found in code</p>';
+                return;
+            }
+
+            const paramLines = defaultParamsMatch[1].split('\n').filter(line => line.includes(':'));
+            let html = '';
+
+            paramLines.forEach((line, idx) => {
+                const match = line.match(/['"]?(\w+)['"]?\s*:\s*(.+?)[,\n]/);
+                if (match) {
+                    const paramName = match[1];
+                    const defaultValue = match[2].trim().replace(/['"]/g, '');
+
+                    html += `
+                    <div style="padding: 15px; background: var(--table-hover); border-radius: 8px; border-left: 3px solid #3b82f6;">
+                        <div style="font-weight: 600; margin-bottom: 12px; font-size: 0.95em;">${paramName}</div>
+
+                        <!-- Option 1: Range -->
+                        <div style="margin-bottom: 12px; padding: 10px; background: var(--panel-bg); border-radius: 6px;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                <input type="checkbox" id="param-range-${idx}" class="param-option" data-param="${idx}" style="width: 18px; height: 18px; cursor: pointer;">
+                                <label for="param-range-${idx}" style="cursor: pointer; flex: 1;">Use From/To Range</label>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-left: 28px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.8em;">From:</label>
+                                    <input type="text" id="param-from-${idx}" placeholder="${defaultValue}" style="padding: 6px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; box-sizing: border-box;" disabled>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.8em;">To:</label>
+                                    <input type="text" id="param-to-${idx}" placeholder="${defaultValue}" style="padding: 6px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; box-sizing: border-box;" disabled>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Option 2: Custom Value -->
+                        <div style="padding: 10px; background: var(--panel-bg); border-radius: 6px;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                <input type="checkbox" id="param-custom-${idx}" class="param-option" data-param="${idx}" style="width: 18px; height: 18px; cursor: pointer;">
+                                <label for="param-custom-${idx}" style="cursor: pointer; flex: 1;">Use Custom Value</label>
+                            </div>
+                            <div style="margin-left: 28px;">
+                                <input type="text" id="param-custom-value-${idx}" placeholder="Enter custom value" style="padding: 6px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; box-sizing: border-box;" disabled>
+                            </div>
+                        </div>
+
+                        <!-- Original Default -->
+                        <div style="margin-top: 8px; padding: 8px; background: rgba(59, 130, 246, 0.1); border-radius: 4px; font-size: 0.8em; color: var(--text-secondary);">
+                            Original Default: <span style="color: var(--text-primary); font-weight: 600;">${defaultValue}</span>
+                        </div>
+                    </div>
+                    `;
+
+                    bruteForceParameters[paramName] = {
+                        default: defaultValue,
+                        index: idx
+                    };
+                }
+            });
+
+            if (html) {
+                container.innerHTML = html;
+
+                // Add event listeners for checkboxes
+                document.querySelectorAll('.param-option').forEach(checkbox => {
+                    checkbox.addEventListener('change', function() {
+                        const paramIdx = this.dataset.param;
+                        const isRange = document.getElementById(`param-range-${paramIdx}`).checked;
+                        const isCustom = document.getElementById(`param-custom-${paramIdx}`).checked;
+
+                        // Enable/disable inputs based on checkbox state
+                        document.getElementById(`param-from-${paramIdx}`).disabled = !isRange;
+                        document.getElementById(`param-to-${paramIdx}`).disabled = !isRange;
+                        document.getElementById(`param-custom-value-${paramIdx}`).disabled = !isCustom;
+                    });
+                });
+            } else {
+                container.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1/-1;">Could not parse parameters</p>';
+            }
+        }
+
+        function runBruteForceTest() {
+            if (!bruteForcePythonScript || !bruteForceOHLCData) {
+                alert('Please upload both Python strategy and OHLC data');
+                return;
+            }
+
+            const resultsContainer = document.getElementById('bruteforce-results');
+            resultsContainer.innerHTML = '<p style="color: var(--text-secondary);">🔄 Running brute force test... This may take a while</p>';
+
+            // Collect parameter configurations
+            const paramConfigs = {};
+            Object.keys(bruteForceParameters).forEach(paramName => {
+                const idx = bruteForceParameters[paramName].index;
+                const isRangeChecked = document.getElementById(`param-range-${idx}`).checked;
+                const isCustomChecked = document.getElementById(`param-custom-${idx}`).checked;
+                const defaultValue = bruteForceParameters[paramName].default;
+
+                // Determine which value(s) to use
+                if (!isRangeChecked && !isCustomChecked) {
+                    // Neither checked: use default
+                    paramConfigs[paramName] = {
+                        from: isNaN(defaultValue) ? defaultValue : parseFloat(defaultValue),
+                        to: isNaN(defaultValue) ? defaultValue : parseFloat(defaultValue),
+                        default: defaultValue
+                    };
+                } else if (isRangeChecked && !isCustomChecked) {
+                    // Only range checked: use from/to values
+                    const fromValue = document.getElementById(`param-from-${idx}`).value || defaultValue;
+                    const toValue = document.getElementById(`param-to-${idx}`).value || defaultValue;
+                    paramConfigs[paramName] = {
+                        from: isNaN(fromValue) ? fromValue : parseFloat(fromValue),
+                        to: isNaN(toValue) ? toValue : parseFloat(toValue),
+                        default: defaultValue
+                    };
+                } else if (!isRangeChecked && isCustomChecked) {
+                    // Only custom checked: use custom value
+                    const customValue = document.getElementById(`param-custom-value-${idx}`).value || defaultValue;
+                    paramConfigs[paramName] = {
+                        from: isNaN(customValue) ? customValue : parseFloat(customValue),
+                        to: isNaN(customValue) ? customValue : parseFloat(customValue),
+                        default: defaultValue
+                    };
+                } else {
+                    // Both checked: use custom value
+                    const customValue = document.getElementById(`param-custom-value-${idx}`).value || defaultValue;
+                    paramConfigs[paramName] = {
+                        from: isNaN(customValue) ? customValue : parseFloat(customValue),
+                        to: isNaN(customValue) ? customValue : parseFloat(customValue),
+                        default: defaultValue
+                    };
+                }
+            });
+
+            // Send to backend
+            const requestData = {
+                python_code: bruteForcePythonScript,
+                ohlc_content: bruteForceOHLCData,
+                parameter_configs: paramConfigs
+            };
+
+            fetch('/api/bruteforce-test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.error) {
+                    resultsContainer.innerHTML = `<p style="color: #ef4444;">❌ Error: ${data.error}</p>`;
+                } else {
+                    displayBruteForceResults(data);
+                }
+            })
+            .catch(err => {
+                resultsContainer.innerHTML = `<p style="color: #ef4444;">❌ Error: ${err.message}</p>`;
+            });
+        }
+
+        function displayBruteForceResults(data) {
+            const container = document.getElementById('bruteforce-results');
+            const results = data.results || [];
+
+            if (!results.length) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No results found</p>';
+                return;
+            }
+
+            // Sort by total_pnl descending
+            results.sort((a, b) => b.total_pnl - a.total_pnl);
+
+            let html = `
+            <div style="margin-bottom: 15px;">
+                <p style="color: var(--text-secondary);">✅ Completed ${results.length} combinations</p>
+            </div>
+            <table class="kpi-table" style="width: 100%; font-size: 0.85em;">
+                <thead><tr>
+                    <th style="width: 120px;">Parameters</th>
+                    <th style="width: 70px;">Trades</th>
+                    <th style="width: 70px;">Wins</th>
+                    <th style="width: 70px;">Win %</th>
+                    <th style="width: 100px;">Total PnL</th>
+                    <th style="width: 80px;">Max DD</th>
+                    <th style="width: 80px;">Profit Factor</th>
+                </tr></thead>
+                <tbody>
+            `;
+
+            results.forEach(result => {
+                const pnlColor = result.total_pnl >= 0 ? 'var(--success-color)' : '#ef4444';
+                const paramStr = Object.entries(result.parameters || {})
+                    .map(([k, v]) => `${k}=${v}`)
+                    .join(', ');
+
+                html += `<tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="font-family: monospace; font-size: 0.8em;">${paramStr}</td>
+                    <td style="text-align: center;">${result.total_trades}</td>
+                    <td style="text-align: center; color: var(--success-color);">${result.winning_trades}</td>
+                    <td style="text-align: center;">${(result.win_rate || 0).toFixed(2)}%</td>
+                    <td style="text-align: right; color: ${pnlColor}; font-weight: bold;">${formatIndianNumber(result.total_pnl.toFixed(2))}</td>
+                    <td style="text-align: right;">${formatIndianNumber((result.max_drawdown || 0).toFixed(2))}</td>
+                    <td style="text-align: right;">${(result.profit_factor || 0).toFixed(2)}</td>
                 </tr>`;
             });
 
