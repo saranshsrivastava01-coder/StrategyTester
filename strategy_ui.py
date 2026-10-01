@@ -853,40 +853,53 @@ def extract_python_parameters():
         if not python_code:
             return jsonify({'error': 'Missing Python code'}), 400
 
-        # Extract DEFAULT_PARAMS or similar dictionary from the code
+        # Extract DEFAULT_PARAMS from code
         import re
 
         parameters = {}
 
-        # Look for DEFAULT_PARAMS = { ... }
-        default_params_match = re.search(r'DEFAULT_PARAMS\s*=\s*\{(.*?)\n\s*\}', python_code, re.DOTALL)
-        if default_params_match:
-            params_text = default_params_match.group(1)
+        # Create namespace and execute code to get variable definitions
+        namespace = {}
+        try:
+            exec(python_code, namespace)
+            if 'DEFAULT_PARAMS' in namespace:
+                parameters = namespace['DEFAULT_PARAMS'].copy()
+        except:
+            pass
 
-            # Extract each parameter
-            param_pattern = r"'(\w+)':\s*([^,]+)"
-            matches = re.findall(param_pattern, params_text)
+        # If execution worked, convert numpy types
+        for key, value in parameters.items():
+            if hasattr(value, 'item'):  # numpy type
+                parameters[key] = value.item()
 
-            for param_name, param_value in matches:
-                param_value = param_value.strip()
+        # If execution didn't work, try regex parsing
+        if not parameters:
+            default_params_match = re.search(r'DEFAULT_PARAMS\s*=\s*\{(.*?)\n\s*\}', python_code, re.DOTALL)
+            if default_params_match:
+                params_text = default_params_match.group(1)
 
-                # Try to evaluate the value
-                try:
-                    if param_value.startswith("'") or param_value.startswith('"'):
-                        # String value
-                        parameters[param_name] = param_value.strip("'\"")
-                    elif param_value.lower() == 'true':
-                        parameters[param_name] = True
-                    elif param_value.lower() == 'false':
-                        parameters[param_name] = False
-                    else:
-                        # Try to convert to number
-                        if '.' in param_value or 'e' in param_value.lower():
-                            parameters[param_name] = float(param_value)
+                # Extract each parameter
+                param_pattern = r"'(\w+)':\s*([^,]+)"
+                matches = re.findall(param_pattern, params_text)
+
+                for param_name, param_value in matches:
+                    param_value = param_value.strip()
+
+                    # Try to evaluate the value
+                    try:
+                        if param_value.startswith("'") or param_value.startswith('"'):
+                            parameters[param_name] = param_value.strip("'\"")
+                        elif param_value.lower() == 'true':
+                            parameters[param_name] = True
+                        elif param_value.lower() == 'false':
+                            parameters[param_name] = False
                         else:
-                            parameters[param_name] = int(param_value)
-                except:
-                    parameters[param_name] = param_value
+                            if '.' in param_value or 'e' in param_value.lower():
+                                parameters[param_name] = float(param_value)
+                            else:
+                                parameters[param_name] = int(param_value)
+                    except:
+                        parameters[param_name] = param_value
 
         return Response(
             json.dumps({
