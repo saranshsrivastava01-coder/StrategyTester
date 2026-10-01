@@ -376,28 +376,34 @@
 
     <div id="reconciliation-page" class="page-content active">
         <div class="container">
-        <!-- LEFT COLUMN: PINE SCRIPT + EXCEL -->
+        <!-- LEFT COLUMN: PINE SCRIPT + EXCEL (Side by Side) -->
         <div class="column left-column">
-            <div class="panel">
-                <h2>📄 Pine Script</h2>
-                <div class="form-group">
-                    <label>Upload .pine file:</label>
-                    <input type="file" id="pine-file" accept=".pine,.txt,.pinescript">
+            <!-- Upload Tiles Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <!-- Pine Script Tile -->
+                <div class="panel">
+                    <h2>📄 Pine Script</h2>
+                    <div class="form-group">
+                        <label>Upload .pine file:</label>
+                        <input type="file" id="pine-file" accept=".pine,.txt,.pinescript">
+                    </div>
+                    <button onclick="uploadPineScript()" style="width: 100%;">Upload</button>
+                    <div id="pine-status" class="status-message"></div>
                 </div>
-                <button onclick="uploadPineScript()">Upload</button>
-                <div id="pine-status" class="status-message"></div>
+
+                <!-- Output Excel Tile -->
+                <div class="panel">
+                    <h2>📊 Output Excel</h2>
+                    <div class="form-group">
+                        <label>Upload .xlsx file:</label>
+                        <input type="file" id="excel-file" accept=".xlsx">
+                    </div>
+                    <button onclick="uploadExcelFile()" style="width: 100%;">Upload & Analyze</button>
+                    <div id="excel-status" class="status-message"></div>
+                </div>
             </div>
 
-            <div class="panel">
-                <h2>📊 Output Excel</h2>
-                <div class="form-group">
-                    <label>Upload .xlsx file:</label>
-                    <input type="file" id="excel-file" accept=".xlsx">
-                </div>
-                <button onclick="uploadExcelFile()">Upload & Analyze</button>
-                <div id="excel-status" class="status-message"></div>
-            </div>
-
+            <!-- Excel KPIs Panel (Full Width) -->
             <div class="panel kpi-container" id="excel-kpi-panel" style="display: none;">
                 <h2>🎯 Excel KPIs</h2>
                 <div id="excel-kpis"></div>
