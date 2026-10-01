@@ -250,21 +250,44 @@
         .kpi-table thead {
             background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
             color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .kpi-table th {
             padding: 12px;
-            text-align: left;
+            text-align: center;
             font-weight: 600;
             border-bottom: 2px solid #3b82f6;
+            border-right: 1px solid rgba(255, 255, 255, 0.3);
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+            color: white;
+            user-select: none;
+        }
+
+        .kpi-table th:last-child {
+            border-right: none;
+        }
+
+        .kpi-table th:hover {
+            background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+            color: white;
+            cursor: pointer;
         }
 
         .kpi-table td {
             padding: 12px;
+            text-align: center;
             border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
         }
 
-        .kpi-table tr:hover {
+        .kpi-table td:last-child {
+            border-right: none;
+        }
+
+        .kpi-table tbody tr:hover {
             background: var(--table-hover);
         }
 
@@ -480,6 +503,14 @@
             </div>
         </div>
 
+        <!-- Monthly Statistics -->
+        <div class="panel">
+            <h2>📅 Monthly Statistics</h2>
+            <div id="monthly-stats" style="max-height: 400px; overflow-y: auto;">
+                <p style="color: var(--text-secondary);">Monthly breakdown will appear here after running backtest</p>
+            </div>
+        </div>
+
         <!-- Trade List -->
         <div class="panel">
             <h2>📋 Trade List</h2>
@@ -491,6 +522,41 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // Format numbers in Indian format (e.g., 12,34,567)
+        function formatIndianNumber(num) {
+            if (num === null || num === undefined || isNaN(num)) return '-';
+
+            const parts = num.toString().split('.');
+            let integerPart = parts[0];
+            const decimalPart = parts[1];
+
+            // Handle negative numbers
+            const isNegative = integerPart.startsWith('-');
+            if (isNegative) {
+                integerPart = integerPart.slice(1);
+            }
+
+            // Indian format: last 3 digits, then groups of 2
+            let formatted = '';
+            if (integerPart.length <= 3) {
+                formatted = integerPart;
+            } else {
+                const lastThree = integerPart.slice(-3);
+                const remaining = integerPart.slice(0, -3);
+                formatted = remaining.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + lastThree;
+            }
+
+            if (isNegative) {
+                formatted = '-' + formatted;
+            }
+
+            if (decimalPart) {
+                formatted += '.' + decimalPart.substring(0, 2);
+            }
+
+            return formatted;
+        }
+
         // Initialize theme
         function initTheme() {
             const savedTheme = localStorage.getItem('theme') || 'auto';
@@ -994,7 +1060,8 @@
             let html = '';
             for (const item of kpiList) {
                 const value = kpis[item.key]?.calculated ?? 0;
-                const displayValue = typeof value === 'number' ? value.toFixed(2) : value;
+                const numValue = typeof value === 'number' ? value.toFixed(2) : value;
+                const displayValue = typeof value === 'number' ? formatIndianNumber(numValue) : value;
                 html += `<div style="padding: 12px; background: var(--table-hover); border-radius: 8px; border-left: 3px solid ${item.color}; text-align: center;">
                     <div style="color: var(--text-secondary); font-size: 0.8em; margin-bottom: 5px;">${item.label}</div>
                     <div style="font-size: 1.5em; font-weight: bold; color: ${item.color};">${displayValue}</div>
@@ -1002,34 +1069,232 @@
             }
             summary.innerHTML = html;
 
+            // Display monthly statistics
+            displayMonthlyStats(data);
+
             // Display trades table
             displayTesterTrades(data);
         }
 
         function displayTesterTrades(data) {
             const container = document.getElementById('tester-trades');
-            const trades = data.kpis?.trades || [];
+            const trades = data.trades || data.kpis?.trades || [];
 
             if (!Array.isArray(trades) || trades.length === 0) {
                 container.innerHTML = '<p style="color: var(--text-secondary);">No trades found</p>';
                 return;
             }
 
-            let html = '<table class="kpi-table" style="width: 100%;"><thead><tr>';
-            html += '<th>Side</th><th>Entry Time</th><th>Entry Price</th><th>Exit Time</th><th>Exit Price</th><th>PnL</th><th>Reason</th>';
-            html += '</tr></thead><tbody>';
+            // Transform trades to match TradingView format (entry and exit rows)
+            let expandedTrades = [];
+            let cumulativePnL = 0;
+
+            trades.forEach((trade, idx) => {
+                const tradeNum = idx + 1;
+                const side = trade.side;
+                const isLong = side === 'Long';
+                const returnPct = trade.pnl / (trade.entry_price * trade.qty) * 100;
+                const duration = (trade.exit_bar || 0) - (trade.entry_bar || 0);
+
+                // Entry row
+                expandedTrades.push({
+                    tradeNum,
+                    type: `Entry ${isLong ? 'long' : 'short'}`,
+                    datetime: trade.entry_time,
+                    price: trade.entry_price,
+                    qty: trade.qty,
+                    pnl: 0,
+                    returnPct: 0,
+                    cumulativePnL: cumulativePnL,
+                    reason: '',
+                    duration,
+                    sortPrice: trade.entry_price,
+                    sortPnL: 0,
+                    sortReturnPct: 0,
+                    sortDateTime: new Date(trade.entry_time).getTime()
+                });
+
+                // Exit row
+                cumulativePnL += trade.pnl;
+                expandedTrades.push({
+                    tradeNum,
+                    type: `Exit ${isLong ? 'long' : 'short'}`,
+                    datetime: trade.exit_time,
+                    price: trade.exit_price,
+                    qty: trade.qty,
+                    pnl: trade.pnl,
+                    returnPct: returnPct,
+                    cumulativePnL: cumulativePnL,
+                    reason: trade.exit_reason || '',
+                    duration,
+                    sortPrice: trade.exit_price,
+                    sortPnL: trade.pnl,
+                    sortReturnPct: returnPct,
+                    sortDateTime: new Date(trade.exit_time).getTime()
+                });
+            });
+
+            // Create table with sortable headers
+            let html = '<table class="kpi-table" id="tradesTable" style="width: 100%; font-size: 0.9em;"><thead><tr>';
+            html += '<th style="width: 60px; cursor: pointer;" onclick="sortTradesTable(\'tradeNum\')">Trade # ↕</th>';
+            html += '<th style="width: 120px; cursor: pointer;" onclick="sortTradesTable(\'type\')">Type ↕</th>';
+            html += '<th style="width: 150px; cursor: pointer;" onclick="sortTradesTable(\'sortDateTime\')">Date and Time ↕</th>';
+            html += '<th style="width: 80px; cursor: pointer;" onclick="sortTradesTable(\'sortPrice\')">Price ↕</th>';
+            html += '<th style="width: 60px; cursor: pointer;" onclick="sortTradesTable(\'qty\')">Qty ↕</th>';
+            html += '<th style="width: 100px; cursor: pointer;" onclick="sortTradesTable(\'sortPnL\')">Net PnL ↕</th>';
+            html += '<th style="width: 80px; cursor: pointer;" onclick="sortTradesTable(\'sortReturnPct\')">Return % ↕</th>';
+            html += '<th style="width: 100px; cursor: pointer;" onclick="sortTradesTable(\'cumulativePnL\')">Cumulative PnL ↕</th>';
+            html += '<th style="width: 80px; cursor: pointer;" onclick="sortTradesTable(\'duration\')">Duration ↕</th>';
+            html += '<th style="width: 120px; cursor: pointer;" onclick="sortTradesTable(\'reason\')">Signal ↕</th>';
+            html += '</tr></thead><tbody id="tradesTableBody">';
+
+            const tableBody = html + renderTradeRows(expandedTrades) + '</tbody></table>';
+            container.innerHTML = tableBody;
+
+            // Store expanded trades data for sorting
+            window.tradesData = expandedTrades;
+            window.tradesSortColumn = null;
+            window.tradesSortAsc = true;
+        }
+
+        function renderTradeRows(expandedTrades) {
+            let html = '';
+            expandedTrades.forEach(row => {
+                const pnlColor = row.pnl >= 0 ? 'var(--success-color)' : '#ef4444';
+                const dateStr = row.datetime ? new Date(row.datetime).toLocaleString() : '-';
+
+                html += `<tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="text-align: center;">${row.tradeNum}</td>
+                    <td style="font-weight: 500;">${row.type}</td>
+                    <td>${dateStr}</td>
+                    <td style="text-align: right;">${formatIndianNumber((row.price || 0).toFixed(2))}</td>
+                    <td style="text-align: center;">${formatIndianNumber(row.qty)}</td>
+                    <td style="text-align: right; color: ${pnlColor}; font-weight: bold;">
+                        ${row.pnl > 0 ? '+' : ''}${formatIndianNumber((row.pnl || 0).toFixed(2))}
+                    </td>
+                    <td style="text-align: right;">${row.returnPct !== 0 ? formatIndianNumber(row.returnPct.toFixed(2)) + '%' : '-'}</td>
+                    <td style="text-align: right; font-weight: 500;">${formatIndianNumber((row.cumulativePnL || 0).toFixed(2))}</td>
+                    <td style="text-align: center;">${formatIndianNumber(row.duration)}</td>
+                    <td>${row.reason}</td>
+                </tr>`;
+            });
+            return html;
+        }
+
+        function sortTradesTable(column) {
+            if (!window.tradesData) return;
+
+            // Toggle sort direction if clicking same column
+            if (window.tradesSortColumn === column) {
+                window.tradesSortAsc = !window.tradesSortAsc;
+            } else {
+                window.tradesSortColumn = column;
+                window.tradesSortAsc = true;
+            }
+
+            // Sort the data
+            const sorted = [...window.tradesData].sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+
+                // Handle numeric comparisons
+                if (typeof aVal === 'number' && typeof bVal === 'number') {
+                    return window.tradesSortAsc ? aVal - bVal : bVal - aVal;
+                }
+
+                // Handle string comparisons
+                if (typeof aVal === 'string' && typeof bVal === 'string') {
+                    return window.tradesSortAsc ?
+                        aVal.localeCompare(bVal) :
+                        bVal.localeCompare(aVal);
+                }
+
+                return 0;
+            });
+
+            // Re-render table with sorted data
+            const tableBody = document.getElementById('tradesTableBody');
+            tableBody.innerHTML = renderTradeRows(sorted);
+        }
+
+        function displayMonthlyStats(data) {
+            const container = document.getElementById('monthly-stats');
+            const trades = data.trades || data.kpis?.trades || [];
+
+            if (!Array.isArray(trades) || trades.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No trades found</p>';
+                return;
+            }
+
+            // Group trades by month
+            const monthlyData = {};
 
             trades.forEach(trade => {
-                const pnl = trade.pnl || 0;
-                const pnlColor = pnl >= 0 ? 'var(--success-color)' : '#ef4444';
-                html += `<tr>
-                    <td>${trade.side || '-'}</td>
-                    <td>${trade.entry_time ? new Date(trade.entry_time).toLocaleString() : '-'}</td>
-                    <td>${(trade.entry_price || 0).toFixed(2)}</td>
-                    <td>${trade.exit_time ? new Date(trade.exit_time).toLocaleString() : '-'}</td>
-                    <td>${(trade.exit_price || 0).toFixed(2)}</td>
-                    <td style="color: ${pnlColor}; font-weight: bold;">${pnl.toFixed(2)}</td>
-                    <td>${trade.exit_reason || '-'}</td>
+                const date = new Date(trade.exit_time);
+                const monthKey = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+                const monthLabel = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+                if (!monthlyData[monthKey]) {
+                    monthlyData[monthKey] = {
+                        label: monthLabel,
+                        trades: [],
+                        totalTrades: 0,
+                        winningTrades: 0,
+                        losingTrades: 0,
+                        totalPnL: 0,
+                        largestProfit: 0,
+                        largestLoss: 0
+                    };
+                }
+
+                monthlyData[monthKey].trades.push(trade);
+                monthlyData[monthKey].totalTrades++;
+
+                if (trade.pnl > 0) {
+                    monthlyData[monthKey].winningTrades++;
+                    monthlyData[monthKey].largestProfit = Math.max(monthlyData[monthKey].largestProfit, trade.pnl);
+                } else if (trade.pnl < 0) {
+                    monthlyData[monthKey].losingTrades++;
+                    monthlyData[monthKey].largestLoss = Math.min(monthlyData[monthKey].largestLoss, trade.pnl);
+                }
+
+                monthlyData[monthKey].totalPnL += trade.pnl;
+            });
+
+            // Sort by month
+            const sortedMonths = Object.keys(monthlyData).sort();
+
+            // Create table
+            let html = '<table class="kpi-table" style="width: 100%; font-size: 0.9em;"><thead><tr>';
+            html += '<th style="width: 100px;">Month</th>';
+            html += '<th style="width: 80px;">Total Trades</th>';
+            html += '<th style="width: 100px;">Winning</th>';
+            html += '<th style="width: 100px;">Losing</th>';
+            html += '<th style="width: 100px;">Monthly PnL</th>';
+            html += '<th style="width: 120px;">Largest Profit</th>';
+            html += '<th style="width: 120px;">Largest Loss</th>';
+            html += '</tr></thead><tbody>';
+
+            sortedMonths.forEach(monthKey => {
+                const month = monthlyData[monthKey];
+                const pnlColor = month.totalPnL >= 0 ? 'var(--success-color)' : '#ef4444';
+                const profitColor = month.largestProfit > 0 ? 'var(--success-color)' : '#999';
+                const lossColor = month.largestLoss < 0 ? '#ef4444' : '#999';
+
+                html += `<tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="font-weight: 500;">${month.label}</td>
+                    <td style="text-align: center;">${formatIndianNumber(month.totalTrades)}</td>
+                    <td style="text-align: center; color: var(--success-color);">${formatIndianNumber(month.winningTrades)}</td>
+                    <td style="text-align: center; color: #ef4444;">${formatIndianNumber(month.losingTrades)}</td>
+                    <td style="text-align: right; color: ${pnlColor}; font-weight: bold;">
+                        ${month.totalPnL > 0 ? '+' : ''}${formatIndianNumber(month.totalPnL.toFixed(2))}
+                    </td>
+                    <td style="text-align: right; color: ${profitColor};">
+                        ${month.largestProfit > 0 ? '+' : ''}${formatIndianNumber(month.largestProfit.toFixed(2))}
+                    </td>
+                    <td style="text-align: right; color: ${lossColor};">
+                        ${month.largestLoss < 0 ? '' : ''}${formatIndianNumber(month.largestLoss.toFixed(2))}
+                    </td>
                 </tr>`;
             });
 

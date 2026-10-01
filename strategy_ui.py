@@ -684,9 +684,22 @@ def backtest_kpis():
             'profit_factor': {'calculated': round(profit_factor, 4), 'formula': f'${gross_profit:,.0f} / ${gross_loss:,.0f}'}
         }
 
+        # Convert trades DataFrame to list of dictionaries
+        trades_list = []
+        if isinstance(trades_data, pd.DataFrame):
+            trades_list = trades_data.to_dict(orient='records')
+            # Convert Timestamp objects to ISO format strings
+            for trade in trades_list:
+                for key, value in trade.items():
+                    if isinstance(value, pd.Timestamp):
+                        trade[key] = value.isoformat()
+        else:
+            trades_list = trades_data
+
         response_data = {
             'success': True,
             'kpis': kpis,
+            'trades': trades_list,
             'summary': f'{total_trades} trades, {winning} winners, {losing} losers'
         }
 
