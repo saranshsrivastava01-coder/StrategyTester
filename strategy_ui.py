@@ -1341,7 +1341,28 @@ def bruteforce_test_numba():
                     session_data['bf_errors'] += 1
                     continue
 
-                strategy = StrategyClass(ohlc_df.copy(), params)
+                # Resolve string constants to actual values (like 'True' -> True, 'EXIT_ORIGINAL' -> constant)
+                resolved_params = {}
+                for param_name, param_value in params.items():
+                    if isinstance(param_value, str):
+                        # Try to convert string booleans
+                        if param_value == 'True' or param_value == 'true':
+                            resolved_params[param_name] = True
+                        elif param_value == 'False' or param_value == 'false':
+                            resolved_params[param_name] = False
+                        else:
+                            # Try to resolve as a constant from the namespace
+                            if param_value in namespace:
+                                resolved_params[param_name] = namespace[param_value]
+                            else:
+                                try:
+                                    resolved_params[param_name] = float(param_value)
+                                except:
+                                    resolved_params[param_name] = param_value
+                    else:
+                        resolved_params[param_name] = param_value
+
+                strategy = StrategyClass(ohlc_df.copy(), resolved_params)
                 result = strategy.run()
 
                 # Convert trades DataFrame and calculate KPIs (same as Current endpoint)
