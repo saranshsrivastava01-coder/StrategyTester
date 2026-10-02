@@ -2039,7 +2039,30 @@
             // Show the download button
             document.getElementById('bruteforce-download-btn').style.display = 'block';
 
-            let html = `<table class="kpi-table" style="width: 100%; font-size: 0.85em;">
+            // Display final stats if available
+            let statsHtml = '';
+            if (data.stats) {
+                const stats = data.stats;
+                const startDate = new Date(stats.start_time * 1000);
+                const endDate = new Date(stats.end_time * 1000);
+                const durationMinutes = (stats.duration_seconds / 60).toFixed(2);
+
+                statsHtml = `
+                    <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 8px; border-left: 4px solid var(--accent-color);">
+                        <h4 style="margin-bottom: 10px; color: var(--accent-color);">📊 Final Statistics</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; font-size: 0.9em;">
+                            <div><strong>Start Time:</strong> ${startDate.toLocaleString()}</div>
+                            <div><strong>End Time:</strong> ${endDate.toLocaleString()}</div>
+                            <div><strong>Duration:</strong> ${stats.duration_seconds.toFixed(2)}s (${durationMinutes} min)</div>
+                            <div><strong>Total Combinations:</strong> ${stats.total_combinations.toLocaleString()}</div>
+                            <div><strong>Throughput:</strong> ${stats.throughput_per_sec.toFixed(2)} combos/sec</div>
+                            <div><strong>Results Found:</strong> ${results.length.toLocaleString()}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            let html = statsHtml + `<table class="kpi-table" style="width: 100%; font-size: 0.85em;">
                 <thead><tr>
                     <th style="width: 100px; text-align: center;">Parameters</th>
                     <th style="width: 60px; text-align: center;">Trades</th>

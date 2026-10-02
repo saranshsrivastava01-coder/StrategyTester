@@ -1190,8 +1190,26 @@ def bruteforce_test():
         # Sort results by total PnL (descending) to match Numba endpoint
         results_sorted = sorted(results, key=lambda x: x.get('total_pnl', 0), reverse=True)
 
+        # Calculate final stats
+        start_time = bruteforce_progress['start_time']
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        total_combinations = len(combinations)
+        throughput_per_sec = total_combinations / elapsed_time if elapsed_time > 0 else 0
+
         return Response(
-            json.dumps({'success': True, 'results': results_sorted}, sort_keys=False, cls=NaNEncoder),
+            json.dumps({
+                'success': True,
+                'results': results_sorted,
+                'implementation': 'current',
+                'stats': {
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'duration_seconds': elapsed_time,
+                    'total_combinations': total_combinations,
+                    'throughput_per_sec': throughput_per_sec
+                }
+            }, sort_keys=False, cls=NaNEncoder),
             mimetype='application/json'
         )
 
@@ -1327,6 +1345,9 @@ def bruteforce_test_numba():
 
         combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
 
+        # Initialize timing
+        start_time = time.time()
+
         session_data['bf_total'] = len(combinations)
         session_data['bf_completed'] = 0
         session_data['bf_errors'] = 0
@@ -1423,8 +1444,26 @@ def bruteforce_test_numba():
 
         results_sorted = sorted(results, key=lambda x: x.get('total_pnl', 0), reverse=True)
 
+        # Calculate final stats
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        total_combinations = len(combinations)
+        throughput_per_sec = total_combinations / elapsed_time if elapsed_time > 0 else 0
+
         return Response(
-            json.dumps({'success': True, 'results': results_sorted, 'note': '✅ Original strategy with Numba JIT-optimized indicators', 'implementation': 'numba'}, cls=NaNEncoder),
+            json.dumps({
+                'success': True,
+                'results': results_sorted,
+                'note': '✅ Original strategy with Numba JIT-optimized indicators',
+                'implementation': 'numba',
+                'stats': {
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'duration_seconds': elapsed_time,
+                    'total_combinations': total_combinations,
+                    'throughput_per_sec': throughput_per_sec
+                }
+            }, cls=NaNEncoder),
             mimetype='application/json'
         )
 
@@ -1528,13 +1567,26 @@ def bruteforce_test_parallel():
         # Mark test as complete
         bruteforce_progress['is_running'] = False
 
+        # Calculate final stats
+        start_time = bruteforce_progress['start_time']
+        end_time = time.time()
+        total_combinations = len(combinations)
+        throughput_per_sec = total_combinations / elapsed_time if elapsed_time > 0 else 0
+
         return Response(
             json.dumps({
                 'success': True,
                 'results': results,
                 'note': f'⚡ Parallel execution ({engine.num_workers} cores) - {elapsed_time:.2f}s',
                 'implementation': 'parallel',
-                'execution_time': elapsed_time
+                'execution_time': elapsed_time,
+                'stats': {
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'duration_seconds': elapsed_time,
+                    'total_combinations': total_combinations,
+                    'throughput_per_sec': throughput_per_sec
+                }
             }, sort_keys=False, cls=NaNEncoder),
             mimetype='application/json'
         )
