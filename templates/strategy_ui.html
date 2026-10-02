@@ -608,8 +608,8 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <select id="implementation-selector-top" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--input-border); background: var(--panel-bg); color: var(--text-primary); font-weight: bold; cursor: pointer; font-size: 0.75em;">
-                        <option value="current" selected>✅ Current</option>
-                        <option value="parallel">🚀 Parallel</option>
+                        <option value="current">✅ Current</option>
+                        <option value="parallel" selected>🚀 Parallel</option>
                         <option value="numba">⚡ Numba</option>
                     </select>
                     <button onclick="runBruteForceTest()" style="padding: 6px 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8em; font-weight: bold; transition: all 0.2s; white-space: nowrap;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
@@ -633,12 +633,12 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <select id="implementation-selector" style="padding: 8px 12px; border-radius: 4px; border: none; background: white; color: #333; font-weight: bold; cursor: pointer; font-size: 0.9em;">
-                        <option value="current" selected>✅ Current (Tested)</option>
-                        <option value="parallel">🚀 Parallel (5.2x faster)</option>
+                        <option value="current">✅ Current (Tested)</option>
+                        <option value="parallel" selected>🚀 Parallel (5.2x faster)</option>
                         <option value="numba">⚡ Numba (Experimental - 15x faster)</option>
                     </select>
-                    <small style="color: rgba(255,255,255,0.8); font-size: 0.8em; max-width: 150px;">
-                        <span id="impl-status-text">Using: Current Implementation</span>
+                    <small style="color: #60A5FA; font-size: 0.8em; max-width: 150px;">
+                        <span id="impl-status-text">Using: Parallel (🚀 5.2x faster)</span>
                     </small>
                 </div>
             </div>
@@ -1560,7 +1560,7 @@
         let bruteForceParameters = {};
         let bruteForceMetadata = {};
         let paramConfigCollapsed = false;
-        let selectedImplementation = 'current';  // NEW: Track selected implementation
+        let selectedImplementation = 'parallel';  // NEW: Track selected implementation (default: Parallel)
 
         // NEW: Implementation selector handler - sync both selectors
         function updateImplementationMode(value) {

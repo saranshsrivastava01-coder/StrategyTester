@@ -1554,8 +1554,8 @@ def bruteforce_test_parallel():
             'is_running': True
         }
 
-        # Run with parallel engine
-        engine = ParallelBacktestEngine()
+        # Run with parallel engine (9 workers - optimal for M1 Pro)
+        engine = ParallelBacktestEngine(num_workers=9)
         results, elapsed_time = engine.run_backtests(
             python_code,
             ohlc_df,
