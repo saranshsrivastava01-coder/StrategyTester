@@ -1640,7 +1640,8 @@
             let html = '';
 
             paramLines.forEach((line, idx) => {
-                const match = line.match(/['"]?(\w+)['"]?\s*:\s*(.+?)[,\n]/);
+                // Fixed regex to handle lines with or without trailing comma, and with comments
+                const match = line.match(/['"]?(\w+)['"]?\s*:\s*([^,#\n]+)/);
                 if (match) {
                     const paramName = match[1];
                     const defaultValue = match[2].trim().replace(/['"]/g, '');
