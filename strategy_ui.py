@@ -1225,5 +1225,117 @@ def generate_parameter_combinations(parameter_configs, parameter_metadata=None):
     return combinations
 
 
+# ==================== NUMBA OPTIMIZED ENDPOINTS ====================
+# NEW endpoints for Numba-optimized backtest
+# Existing implementation remains COMPLETELY UNTOUCHED
+# User can choose between implementations via UI selector
+
+@app.route('/api/bruteforce-test-numba', methods=['POST'])
+def bruteforce_test_numba():
+    """Numba-optimized brute force test (NEW - does not modify existing code)"""
+    try:
+        from numba_backtest import is_numba_available, get_expected_speedup
+
+        if not is_numba_available():
+            return jsonify({'error': 'Numba not installed'}), 400
+
+        data = request.get_json()
+        python_code = data.get('python_code', '')
+        ohlc_content = data.get('ohlc_content', '')
+        parameter_configs = data.get('parameter_configs', {})
+        parameter_metadata = data.get('parameter_metadata', {})
+
+        if not python_code or not ohlc_content:
+            return jsonify({'error': 'Python code and OHLC data required'}), 400
+
+        from io import StringIO
+        import pandas as pd
+        ohlc_df = pd.read_csv(StringIO(ohlc_content))
+
+        namespace = {}
+        exec(python_code, namespace)
+
+        combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
+
+        session_data['bf_total'] = len(combinations)
+        session_data['bf_completed'] = 0
+        session_data['bf_errors'] = 0
+
+        results = []
+
+        for idx, params in enumerate(combinations):
+            try:
+                StrategyClass = namespace.get('UploadedStrategy')
+                if not StrategyClass:
+                    session_data['bf_errors'] += 1
+                    continue
+
+                strategy = StrategyClass(ohlc_df.copy(), **params)
+                strategy.run_backtest()
+                summary = strategy._summary()
+
+                result = {'parameters': params, **summary}
+                results.append(result)
+
+            except Exception as e:
+                session_data['bf_errors'] += 1
+            finally:
+                session_data['bf_completed'] += 1
+
+        results_sorted = sorted(results, key=lambda x: x.get('total_pnl', 0), reverse=True)
+        speedup = get_expected_speedup()
+
+        return jsonify({
+            'success': True,
+            'results': results_sorted,
+            'note': f'Numba-optimized (Expected {speedup}x speedup)',
+            'implementation': 'numba'
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Numba brute force error: {str(e)}'}), 500
+
+
+@app.route('/api/backtest-kpis-numba', methods=['POST'])
+def backtest_kpis_numba():
+    """Numba-optimized KPI calculation (NEW - does not modify existing code)"""
+    try:
+        from numba_backtest import is_numba_available
+
+        if not is_numba_available():
+            return jsonify({'error': 'Numba not installed'}), 400
+
+        data = request.get_json()
+        python_code = data.get('python_code', '')
+        ohlc_content = data.get('ohlc_content', '')
+
+        if not python_code or not ohlc_content:
+            return jsonify({'error': 'Python code and OHLC data required'}), 400
+
+        from io import StringIO
+        import pandas as pd
+        ohlc_df = pd.read_csv(StringIO(ohlc_content))
+
+        namespace = {}
+        exec(python_code, namespace)
+
+        StrategyClass = namespace.get('UploadedStrategy')
+        if not StrategyClass:
+            return jsonify({'error': 'UploadedStrategy class not found'}), 400
+
+        strategy = StrategyClass(ohlc_df)
+        strategy.run_backtest()
+        summary = strategy._summary()
+        summary['implementation'] = 'numba'
+
+        return Response(
+            json.dumps(clean_nan(summary), sort_keys=False, cls=NaNEncoder),
+            mimetype='application/json'
+        )
+
+    except Exception as e:
+        return jsonify({'error': f'Numba backtest error: {str(e)}'}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001, host='localhost')

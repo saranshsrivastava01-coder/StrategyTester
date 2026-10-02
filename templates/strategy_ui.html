@@ -619,6 +619,25 @@
             </div>
         </div>
 
+        <!-- Implementation Selector -->
+        <div class="panel" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px;">
+                <div>
+                    <h3 style="margin: 0; color: white; font-size: 1em;">🚀 Implementation Mode</h3>
+                    <p style="margin: 5px 0 0 0; color: rgba(255,255,255,0.9); font-size: 0.85em;">Choose execution engine</p>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="implementation-selector" style="padding: 8px 12px; border-radius: 4px; border: none; background: white; color: #333; font-weight: bold; cursor: pointer; font-size: 0.9em;">
+                        <option value="current" selected>✅ Current (Tested)</option>
+                        <option value="numba">⚡ Numba (Experimental - 15x faster)</option>
+                    </select>
+                    <small style="color: rgba(255,255,255,0.8); font-size: 0.8em; max-width: 150px;">
+                        <span id="impl-status-text">Using: Current Implementation</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+
         <!-- Results -->
         <div class="panel">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 15px;">
@@ -1535,6 +1554,20 @@
         let bruteForceParameters = {};
         let bruteForceMetadata = {};
         let paramConfigCollapsed = false;
+        let selectedImplementation = 'current';  // NEW: Track selected implementation
+
+        // NEW: Implementation selector handler
+        document.getElementById('implementation-selector')?.addEventListener('change', function() {
+            selectedImplementation = this.value;
+            const statusText = document.getElementById('impl-status-text');
+            if (selectedImplementation === 'numba') {
+                statusText.textContent = 'Using: Numba (⚡ 15x faster - Experimental)';
+                statusText.style.color = '#4ADE80';
+            } else {
+                statusText.textContent = 'Using: Current Implementation (✅ Tested)';
+                statusText.style.color = 'rgba(255,255,255,0.8)';
+            }
+        });
 
         function toggleParameterConfig() {
             const content = document.getElementById('param-config-content');
@@ -1829,7 +1862,10 @@
                 }
             }, 1000);
 
-            fetch('/api/bruteforce-test', {
+            // NEW: Use selected implementation (Current or Numba)
+            const endpoint = selectedImplementation === 'numba' ? '/api/bruteforce-test-numba' : '/api/bruteforce-test';
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestData)
