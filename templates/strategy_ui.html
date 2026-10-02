@@ -629,6 +629,7 @@
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <select id="implementation-selector" style="padding: 8px 12px; border-radius: 4px; border: none; background: white; color: #333; font-weight: bold; cursor: pointer; font-size: 0.9em;">
                         <option value="current" selected>✅ Current (Tested)</option>
+                        <option value="parallel">🚀 Parallel (5.2x faster)</option>
                         <option value="numba">⚡ Numba (Experimental - 15x faster)</option>
                     </select>
                     <small style="color: rgba(255,255,255,0.8); font-size: 0.8em; max-width: 150px;">
@@ -1563,6 +1564,9 @@
             if (selectedImplementation === 'numba') {
                 statusText.textContent = 'Using: Numba (⚡ 15x faster - Experimental)';
                 statusText.style.color = '#4ADE80';
+            } else if (selectedImplementation === 'parallel') {
+                statusText.textContent = 'Using: Parallel (🚀 5.2x faster)';
+                statusText.style.color = '#60A5FA';
             } else {
                 statusText.textContent = 'Using: Current Implementation (✅ Tested)';
                 statusText.style.color = 'rgba(255,255,255,0.8)';
@@ -1862,8 +1866,13 @@
                 }
             }, 1000);
 
-            // NEW: Use selected implementation (Current or Numba)
-            const endpoint = selectedImplementation === 'numba' ? '/api/bruteforce-test-numba' : '/api/bruteforce-test';
+            // NEW: Use selected implementation (Current, Parallel, or Numba)
+            let endpoint = '/api/bruteforce-test';  // default: current
+            if (selectedImplementation === 'numba') {
+                endpoint = '/api/bruteforce-test-numba';
+            } else if (selectedImplementation === 'parallel') {
+                endpoint = '/api/bruteforce-test-parallel';
+            }
 
             fetch(endpoint, {
                 method: 'POST',

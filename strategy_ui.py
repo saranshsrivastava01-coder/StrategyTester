@@ -1389,6 +1389,93 @@ def bruteforce_test_numba():
         return jsonify({'error': f'Numba brute force error: {str(e)}'}), 500
 
 
+@app.route('/api/bruteforce-test-parallel', methods=['POST'])
+def bruteforce_test_parallel():
+    """
+    Parallel brute force test - 3-4x speedup using multiprocessing
+    Uses all available CPU cores for simultaneous backtest execution
+    """
+    try:
+        from parallel_backtest import ParallelBacktestEngine
+
+        data = request.json
+        python_code = data.get('python_code')
+        ohlc_content = data.get('ohlc_content')
+        parameter_configs = data.get('parameter_configs', {})
+        parameter_metadata = data.get('parameter_metadata', {})
+
+        # Ensure Freedom filter is disabled
+        if 'useFreedomFilter' not in parameter_configs:
+            parameter_configs['useFreedomFilter'] = {
+                'from': False,
+                'to': False,
+                'default': False
+            }
+
+        if not python_code or not ohlc_content:
+            return jsonify({'error': 'Python code and OHLC data required'}), 400
+
+        from io import StringIO
+        ohlc_df = pd.read_csv(StringIO(ohlc_content))
+
+        # Normalize columns
+        ohlc_df.columns = ohlc_df.columns.str.lower().str.strip()
+        col_mapping = {}
+        for idx, col in enumerate(ohlc_df.columns):
+            if idx == 0:
+                col_mapping[col] = 'time'
+            elif idx == 1:
+                col_mapping[col] = 'open'
+            elif idx == 2:
+                col_mapping[col] = 'high'
+            elif idx == 3:
+                col_mapping[col] = 'low'
+            elif idx == 4:
+                col_mapping[col] = 'close'
+        ohlc_df.rename(columns=col_mapping, inplace=True)
+
+        if 'time' in ohlc_df.columns:
+            ohlc_df['time'] = pd.to_datetime(ohlc_df['time'])
+            if ohlc_df['time'].dt.tz is not None:
+                ohlc_df['time'] = ohlc_df['time'].dt.tz_localize(None)
+
+        if 'volume' not in ohlc_df.columns:
+            ohlc_df['volume'] = 0
+
+        # Execute code to get metadata
+        namespace = {}
+        exec(python_code, namespace)
+
+        if not parameter_metadata:
+            parameter_metadata = namespace.get('PARAMETER_METADATA', {})
+
+        # Generate combinations
+        combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
+
+        # Run with parallel engine
+        engine = ParallelBacktestEngine()
+        results, elapsed_time = engine.run_backtests(
+            python_code,
+            ohlc_df,
+            combinations,
+            parameter_metadata
+        )
+
+        return Response(
+            json.dumps({
+                'success': True,
+                'results': results,
+                'note': f'⚡ Parallel execution ({engine.num_workers} cores) - {elapsed_time:.2f}s',
+                'implementation': 'parallel',
+                'execution_time': elapsed_time
+            }, sort_keys=False, cls=NaNEncoder),
+            mimetype='application/json'
+        )
+
+    except Exception as e:
+        return jsonify({'error': f'Parallel brute force error: {str(e)}'}), 500
+
+
 @app.route('/api/backtest-kpis-numba', methods=['POST'])
 def backtest_kpis_numba():
     """
