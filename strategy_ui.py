@@ -1505,13 +1505,20 @@ def bruteforce_test_parallel():
         # Generate combinations
         combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
 
+        # Initialize progress tracking (like sequential endpoint)
+        global session_data
+        session_data['bf_total'] = len(combinations)
+        session_data['bf_completed'] = 0
+        session_data['bf_errors'] = 0
+
         # Run with parallel engine
         engine = ParallelBacktestEngine()
         results, elapsed_time = engine.run_backtests(
             python_code,
             ohlc_df,
             combinations,
-            parameter_metadata
+            parameter_metadata,
+            progress_callback=lambda completed, total: session_data.update({'bf_completed': completed})
         )
 
         return Response(

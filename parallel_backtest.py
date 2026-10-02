@@ -116,7 +116,7 @@ class ParallelBacktestEngine:
         self.num_workers = num_workers
         print(f"⚡ Parallel Engine: Using {num_workers} worker processes")
 
-    def run_backtests(self, python_code, ohlc_df, combinations, parameter_metadata=None):
+    def run_backtests(self, python_code, ohlc_df, combinations, parameter_metadata=None, progress_callback=None):
         """
         Run multiple backtests in parallel
 
@@ -125,6 +125,7 @@ class ParallelBacktestEngine:
             ohlc_df: OHLC dataframe
             combinations: List of parameter dicts
             parameter_metadata: Parameter metadata (optional)
+            progress_callback: Optional callback function(completed, total) for progress updates
 
         Returns:
             List of results (sorted by total_pnl descending)
@@ -156,6 +157,10 @@ class ParallelBacktestEngine:
                         results.append(result)
 
                     completed += 1
+
+                    # Call progress callback if provided
+                    if progress_callback:
+                        progress_callback(completed, len(combinations))
 
                     # Progress update every 10 results or at start/end
                     if completed % max(1, len(combinations) // 10) == 0 or completed == len(combinations):
