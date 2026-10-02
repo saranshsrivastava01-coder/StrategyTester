@@ -25,6 +25,13 @@ class NaNEncoder(json.JSONEncoder):
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
+# Global session data for tracking brute force progress
+session_data = {
+    'bf_total': 0,
+    'bf_completed': 0,
+    'bf_errors': 0
+}
+
 # Helper function to clean NaN values from dictionaries
 def clean_nan(obj):
     """Recursively replace NaN with None in dictionaries"""
