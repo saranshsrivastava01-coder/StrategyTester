@@ -1262,6 +1262,31 @@ def bruteforce_test_numba():
 
         ohlc_df = pd.read_csv(StringIO(ohlc_content))
 
+        # Normalize OHLC columns
+        ohlc_df.columns = ohlc_df.columns.str.lower().str.strip()
+        col_mapping = {}
+        for idx, col in enumerate(ohlc_df.columns):
+            if idx == 0:
+                col_mapping[col] = 'time'
+            elif idx == 1:
+                col_mapping[col] = 'open'
+            elif idx == 2:
+                col_mapping[col] = 'high'
+            elif idx == 3:
+                col_mapping[col] = 'low'
+            elif idx == 4:
+                col_mapping[col] = 'close'
+        ohlc_df.rename(columns=col_mapping, inplace=True)
+
+        if 'time' in ohlc_df.columns:
+            ohlc_df['time'] = pd.to_datetime(ohlc_df['time'])
+            if ohlc_df['time'].dt.tz is not None:
+                ohlc_df['time'] = ohlc_df['time'].dt.tz_localize(None)
+            ohlc_df.set_index('time', inplace=True)
+
+        if 'volume' not in ohlc_df.columns:
+            ohlc_df['volume'] = 0
+
         # Ensure Freedom filter is disabled to allow trades to execute (same as Current endpoint)
         if 'useFreedomFilter' not in parameter_configs:
             parameter_configs['useFreedomFilter'] = {
@@ -1270,7 +1295,7 @@ def bruteforce_test_numba():
                 'default': False
             }
 
-        # Execute original Python code to get the strategy
+        # Execute original Python code to get metadata
         namespace = {}
         exec(python_code, namespace)
 
@@ -1288,8 +1313,7 @@ def bruteforce_test_numba():
 
         for idx, params in enumerate(combinations):
             try:
-                # Use original strategy class (ensures correct trading logic)
-                # Numba JIT compilation happens in indicator calculations
+                # Use original strategy class (optimized utility functions available internally)
                 StrategyClass = namespace.get('UploadedStrategy')
                 if not StrategyClass:
                     session_data['bf_errors'] += 1
@@ -1408,14 +1432,20 @@ def backtest_kpis_numba():
         if 'volume' not in ohlc_df.columns:
             ohlc_df['volume'] = 0
 
-        # Execute original Python code to get the strategy
+        from version_11_numba_optimized import UploadedStrategyNumbaOptimized
+
+        # Ensure time is set as index for Numba-optimized strategy
+        if 'time' in ohlc_df.columns:
+            ohlc_df.set_index('time', inplace=True)
+
+        # Execute original Python code to get metadata
         namespace = {}
         exec(python_code, namespace)
 
         # Get parameter metadata
         parameter_metadata = namespace.get('PARAMETER_METADATA', {})
 
-        # Use original strategy class (ensures correct trading logic)
+        # Use original strategy class (optimized utility functions available internally)
         StrategyClass = namespace.get('UploadedStrategy')
         if not StrategyClass:
             return jsonify({'error': 'UploadedStrategy class not found'}), 400
