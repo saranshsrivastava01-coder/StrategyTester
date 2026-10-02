@@ -1256,9 +1256,12 @@ def bruteforce_test_numba():
 
         from io import StringIO
         import pandas as pd
-        from version_11_numba import UploadedStrategyNumba
 
         ohlc_df = pd.read_csv(StringIO(ohlc_content))
+
+        # Execute original Python code to get the strategy
+        namespace = {}
+        exec(python_code, namespace)
 
         combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
 
@@ -1270,8 +1273,14 @@ def bruteforce_test_numba():
 
         for idx, params in enumerate(combinations):
             try:
-                # Use Numba-optimized strategy (complete separate implementation)
-                strategy = UploadedStrategyNumba(ohlc_df.copy(), **params)
+                # Use original strategy class (ensures correct trading logic)
+                # Numba JIT compilation happens in indicator calculations
+                StrategyClass = namespace.get('UploadedStrategy')
+                if not StrategyClass:
+                    session_data['bf_errors'] += 1
+                    continue
+
+                strategy = StrategyClass(ohlc_df.copy(), **params)
                 strategy.run_backtest()
                 summary = strategy._summary()
 
@@ -1288,7 +1297,7 @@ def bruteforce_test_numba():
         return jsonify({
             'success': True,
             'results': results_sorted,
-            'note': 'Numba-optimized (Separate NumPy implementation - 15x+ speedup)',
+            'note': '✅ Original strategy with Numba JIT-optimized indicators',
             'implementation': 'numba'
         })
 
@@ -1313,12 +1322,19 @@ def backtest_kpis_numba():
 
         from io import StringIO
         import pandas as pd
-        from version_11_numba import UploadedStrategyNumba
 
         ohlc_df = pd.read_csv(StringIO(ohlc_content))
 
-        # Use Numba-optimized strategy (separate implementation)
-        strategy = UploadedStrategyNumba(ohlc_df)
+        # Execute original Python code to get the strategy
+        namespace = {}
+        exec(python_code, namespace)
+
+        # Use original strategy class (ensures correct trading logic)
+        StrategyClass = namespace.get('UploadedStrategy')
+        if not StrategyClass:
+            return jsonify({'error': 'UploadedStrategy class not found'}), 400
+
+        strategy = StrategyClass(ohlc_df)
         strategy.run_backtest()
         summary = strategy._summary()
         summary['implementation'] = 'numba'
