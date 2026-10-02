@@ -1638,6 +1638,7 @@
 
             const paramLines = defaultParamsMatch[1].split('\n').filter(line => line.includes(':'));
             let html = '';
+            console.log('🔍 extractBruteForceParameters: Found ' + paramLines.length + ' parameter lines');
 
             paramLines.forEach((line, idx) => {
                 // Fixed regex to handle lines with or without trailing comma, and with comments
@@ -1645,6 +1646,7 @@
                 if (match) {
                     const paramName = match[1];
                     const defaultValue = match[2].trim().replace(/['"]/g, '');
+                    console.log('  ✅ Extracted: ' + paramName + ' = ' + defaultValue);
                     const metadata = bruteForceMetadata[paramName];
                     const hasDecimalStep = metadata && metadata.step && parseFloat(metadata.step) < 1;
                     const stepValue = metadata?.step || 1;
@@ -1780,6 +1782,7 @@
         function collectParameterConfigs() {
             const paramConfigs = {};
             const customSteps = {};
+            console.log('🔨 collectParameterConfigs: Processing ' + Object.keys(bruteForceParameters).length + ' parameters');
 
             Object.keys(bruteForceParameters).forEach(paramName => {
                 const idx = bruteForceParameters[paramName].index;
@@ -1843,6 +1846,10 @@
                 parameter_configs: paramConfigs,
                 parameter_metadata: metadata || bruteForceMetadata
             };
+            console.log('📤 Sending to backend:');
+            console.log('   parameter_configs: ' + Object.keys(paramConfigs).length + ' parameters');
+            console.log('   Params: ' + Object.keys(paramConfigs).join(', '));
+            console.log('   endpoint: ' + (selectedImplementation === 'numba' ? '/api/bruteforce-test-numba' : selectedImplementation === 'parallel' ? '/api/bruteforce-test-parallel' : '/api/bruteforce-test'));
 
             const startTime = Date.now();
 
