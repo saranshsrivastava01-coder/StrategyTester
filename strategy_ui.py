@@ -1056,12 +1056,24 @@ def bruteforce_test():
         # Execute code to get namespace with constants (for resolving parameter values)
         namespace = {}
         parameter_metadata = {}
+        default_params = {}
         try:
             exec(python_code, namespace)
             if 'PARAMETER_METADATA' in namespace:
                 parameter_metadata = namespace['PARAMETER_METADATA']
+            if 'DEFAULT_PARAMS' in namespace:
+                default_params = namespace['DEFAULT_PARAMS']
         except:
             pass
+
+        # Auto-fill missing parameters with defaults (in case UI didn't send all of them)
+        for param_name, default_value in default_params.items():
+            if param_name not in parameter_configs:
+                parameter_configs[param_name] = {
+                    'from': default_value,
+                    'to': default_value,
+                    'default': default_value
+                }
 
         # Generate parameter combinations
         results = []
@@ -1303,6 +1315,16 @@ def bruteforce_test_numba():
         if not parameter_metadata:
             parameter_metadata = namespace.get('PARAMETER_METADATA', {})
 
+        # Auto-fill missing parameters with defaults from DEFAULT_PARAMS
+        default_params = namespace.get('DEFAULT_PARAMS', {})
+        for param_name, default_value in default_params.items():
+            if param_name not in parameter_configs:
+                parameter_configs[param_name] = {
+                    'from': default_value,
+                    'to': default_value,
+                    'default': default_value
+                }
+
         combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
 
         session_data['bf_total'] = len(combinations)
@@ -1448,6 +1470,16 @@ def bruteforce_test_parallel():
 
         if not parameter_metadata:
             parameter_metadata = namespace.get('PARAMETER_METADATA', {})
+
+        # Auto-fill missing parameters with defaults from DEFAULT_PARAMS
+        default_params = namespace.get('DEFAULT_PARAMS', {})
+        for param_name, default_value in default_params.items():
+            if param_name not in parameter_configs:
+                parameter_configs[param_name] = {
+                    'from': default_value,
+                    'to': default_value,
+                    'default': default_value
+                }
 
         # Generate combinations
         combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
