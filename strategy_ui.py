@@ -1175,8 +1175,11 @@ def bruteforce_test():
         if not results:
             return jsonify({'error': 'No successful combinations. Check that parameters are valid and strategy can execute.', 'combinations_tested': len(combinations)}), 400
 
+        # Sort results by total PnL (descending) to match Numba endpoint
+        results_sorted = sorted(results, key=lambda x: x.get('total_pnl', 0), reverse=True)
+
         return Response(
-            json.dumps({'success': True, 'results': results}, sort_keys=False, cls=NaNEncoder),
+            json.dumps({'success': True, 'results': results_sorted}, sort_keys=False, cls=NaNEncoder),
             mimetype='application/json'
         )
 
@@ -1259,9 +1262,21 @@ def bruteforce_test_numba():
 
         ohlc_df = pd.read_csv(StringIO(ohlc_content))
 
+        # Ensure Freedom filter is disabled to allow trades to execute (same as Current endpoint)
+        if 'useFreedomFilter' not in parameter_configs:
+            parameter_configs['useFreedomFilter'] = {
+                'from': False,
+                'to': False,
+                'default': False
+            }
+
         # Execute original Python code to get the strategy
         namespace = {}
         exec(python_code, namespace)
+
+        # Extract parameter metadata from namespace if not provided
+        if not parameter_metadata:
+            parameter_metadata = namespace.get('PARAMETER_METADATA', {})
 
         combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
 
@@ -1280,11 +1295,58 @@ def bruteforce_test_numba():
                     session_data['bf_errors'] += 1
                     continue
 
-                strategy = StrategyClass(ohlc_df.copy(), **params)
-                strategy.run_backtest()
-                summary = strategy._summary()
+                strategy = StrategyClass(ohlc_df.copy(), params)
+                result = strategy.run()
+
+                # Convert trades DataFrame and calculate KPIs (same as Current endpoint)
+                trades_list = []
+                trades_data = result.get('trades', pd.DataFrame())
+                if isinstance(trades_data, pd.DataFrame) and not trades_data.empty:
+                    trades_list = trades_data.to_dict(orient='records')
+                    # Convert Timestamp objects to ISO strings
+                    for trade in trades_list:
+                        for key, val in trade.items():
+                            if isinstance(val, pd.Timestamp):
+                                trade[key] = val.isoformat()
+                            elif isinstance(val, float) and (np.isnan(val) or np.isinf(val)):
+                                trade[key] = None
+
+                # Calculate KPIs from trades (same logic as Current endpoint)
+                trades_df = pd.DataFrame(trades_list) if trades_list else pd.DataFrame()
+                total_trades = len(trades_df)
+                winning = len(trades_df[trades_df['pnl'] > 0]) if 'pnl' in trades_df.columns and len(trades_df) > 0 else 0
+                losing = len(trades_df[trades_df['pnl'] < 0]) if 'pnl' in trades_df.columns and len(trades_df) > 0 else 0
+                total_pnl = float(trades_df['pnl'].sum()) if 'pnl' in trades_df.columns and len(trades_df) > 0 else 0
+                profit_factor = 0
+                max_profit = 0
+                max_loss = 0
+
+                if total_trades > 0 and 'pnl' in trades_df.columns:
+                    gross_profit = float(trades_df[trades_df['pnl'] > 0]['pnl'].sum()) if 'pnl' in trades_df.columns else 0
+                    gross_loss = float(abs(trades_df[trades_df['pnl'] < 0]['pnl'].sum())) if 'pnl' in trades_df.columns else 0
+                    profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
+                    win_rate = (winning / total_trades * 100) if total_trades > 0 else 0
+                    max_profit = float(trades_df['pnl'].max()) if len(trades_df) > 0 else 0
+                    max_loss = float(trades_df['pnl'].min()) if len(trades_df) > 0 else 0
+                else:
+                    win_rate = 0
+
+                summary = {
+                    'total_trades': int(total_trades),
+                    'winning_trades': int(winning),
+                    'losing_trades': int(losing),
+                    'win_rate': float(win_rate),
+                    'max_profit': float(max_profit),
+                    'max_loss': float(max_loss),
+                    'total_pnl': float(total_pnl),
+                    'max_drawdown': float(result.get('max_drawdown', 0)),
+                    'max_drawdown_intrabar': float(result.get('max_drawdown', 0)),
+                    'profit_factor': float(profit_factor),
+                    'trades': trades_list
+                }
 
                 result = {'parameters': params, **summary}
+                result = clean_nan(result)
                 results.append(result)
 
             except Exception as e:
@@ -1294,12 +1356,10 @@ def bruteforce_test_numba():
 
         results_sorted = sorted(results, key=lambda x: x.get('total_pnl', 0), reverse=True)
 
-        return jsonify({
-            'success': True,
-            'results': results_sorted,
-            'note': '✅ Original strategy with Numba JIT-optimized indicators',
-            'implementation': 'numba'
-        })
+        return Response(
+            json.dumps({'success': True, 'results': results_sorted, 'note': '✅ Original strategy with Numba JIT-optimized indicators', 'implementation': 'numba'}, cls=NaNEncoder),
+            mimetype='application/json'
+        )
 
     except Exception as e:
         return jsonify({'error': f'Numba brute force error: {str(e)}'}), 500
@@ -1309,38 +1369,101 @@ def bruteforce_test_numba():
 def backtest_kpis_numba():
     """
     Numba-optimized KPI calculation - COMPLETELY SEPARATE IMPLEMENTATION
-    Uses version_11_numba.py with NumPy arrays and Numba JIT
+    Uses original strategy with isolated Numba optimization option
     Original version_11.py remains 100% untouched
     """
     try:
         data = request.get_json()
         python_code = data.get('python_code', '')
         ohlc_content = data.get('ohlc_content', '')
+        parameters = data.get('parameters', {})
 
         if not python_code or not ohlc_content:
             return jsonify({'error': 'Python code and OHLC data required'}), 400
 
         from io import StringIO
-        import pandas as pd
-
         ohlc_df = pd.read_csv(StringIO(ohlc_content))
+
+        # Normalize OHLC columns
+        ohlc_df.columns = ohlc_df.columns.str.lower().str.strip()
+        col_mapping = {}
+        for idx, col in enumerate(ohlc_df.columns):
+            if idx == 0:
+                col_mapping[col] = 'time'
+            elif idx == 1:
+                col_mapping[col] = 'open'
+            elif idx == 2:
+                col_mapping[col] = 'high'
+            elif idx == 3:
+                col_mapping[col] = 'low'
+            elif idx == 4:
+                col_mapping[col] = 'close'
+        ohlc_df.rename(columns=col_mapping, inplace=True)
+
+        if 'time' in ohlc_df.columns:
+            ohlc_df['time'] = pd.to_datetime(ohlc_df['time'])
+            if ohlc_df['time'].dt.tz is not None:
+                ohlc_df['time'] = ohlc_df['time'].dt.tz_localize(None)
+
+        if 'volume' not in ohlc_df.columns:
+            ohlc_df['volume'] = 0
 
         # Execute original Python code to get the strategy
         namespace = {}
         exec(python_code, namespace)
+
+        # Get parameter metadata
+        parameter_metadata = namespace.get('PARAMETER_METADATA', {})
 
         # Use original strategy class (ensures correct trading logic)
         StrategyClass = namespace.get('UploadedStrategy')
         if not StrategyClass:
             return jsonify({'error': 'UploadedStrategy class not found'}), 400
 
-        strategy = StrategyClass(ohlc_df)
-        strategy.run_backtest()
-        summary = strategy._summary()
-        summary['implementation'] = 'numba'
+        strategy = StrategyClass(ohlc_df.copy(), parameters)
+        result = strategy.run()
+
+        # Calculate KPIs from trades (same logic as brute force endpoint)
+        trades_list = []
+        trades_data = result.get('trades', pd.DataFrame())
+        if isinstance(trades_data, pd.DataFrame) and not trades_data.empty:
+            trades_list = trades_data.to_dict(orient='records')
+
+        # Calculate KPI metrics
+        trades_df = pd.DataFrame(trades_list) if trades_list else pd.DataFrame()
+        total_trades = len(trades_df)
+        winning = len(trades_df[trades_df['pnl'] > 0]) if 'pnl' in trades_df.columns and len(trades_df) > 0 else 0
+        losing = len(trades_df[trades_df['pnl'] < 0]) if 'pnl' in trades_df.columns and len(trades_df) > 0 else 0
+        total_pnl = float(trades_df['pnl'].sum()) if 'pnl' in trades_df.columns and len(trades_df) > 0 else 0
+        profit_factor = 0
+        max_profit = 0
+        max_loss = 0
+
+        if total_trades > 0 and 'pnl' in trades_df.columns:
+            gross_profit = float(trades_df[trades_df['pnl'] > 0]['pnl'].sum()) if 'pnl' in trades_df.columns else 0
+            gross_loss = float(abs(trades_df[trades_df['pnl'] < 0]['pnl'].sum())) if 'pnl' in trades_df.columns else 0
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
+            win_rate = (winning / total_trades * 100) if total_trades > 0 else 0
+            max_profit = float(trades_df['pnl'].max()) if len(trades_df) > 0 else 0
+            max_loss = float(trades_df['pnl'].min()) if len(trades_df) > 0 else 0
+        else:
+            win_rate = 0
+
+        kpis = {
+            'total_trades': {'calculated': total_trades, 'formula': 'COUNT(all trades)'},
+            'winning_trades': {'calculated': winning, 'formula': 'COUNT(pnl > 0)'},
+            'losing_trades': {'calculated': losing, 'formula': 'COUNT(pnl < 0)'},
+            'win_rate': {'calculated': round(win_rate, 2), 'formula': f'({winning}/{total_trades}) × 100'},
+            'max_profit': {'calculated': round(max_profit, 2), 'formula': 'MAX(pnl)'},
+            'max_loss': {'calculated': round(max_loss, 2), 'formula': 'MIN(pnl)'},
+            'total_pnl': {'calculated': round(total_pnl, 2), 'formula': 'SUM(trade PnL)'},
+            'max_drawdown_cc': {'calculated': round(float(result.get('max_drawdown', 0)), 2), 'formula': 'Close-to-close drawdown'},
+            'max_drawdown_intrabar': {'calculated': round(float(result.get('max_drawdown', 0)), 2), 'formula': 'Equity-based drawdown'},
+            'profit_factor': {'calculated': round(profit_factor, 4), 'formula': f'${gross_profit:,.0f} / ${gross_loss:,.0f}'}
+        }
 
         return Response(
-            json.dumps(clean_nan(summary), sort_keys=False, cls=NaNEncoder),
+            json.dumps({'success': True, 'kpis': kpis, 'implementation': 'numba'}, sort_keys=False, cls=NaNEncoder),
             mimetype='application/json'
         )
 
