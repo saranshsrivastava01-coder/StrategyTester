@@ -1898,5 +1898,160 @@ def backtest_kpis_numba():
         return jsonify({'error': f'Numba backtest error: {str(e)}'}), 500
 
 
+@app.route('/api/bruteforce-test-multi-tf', methods=['POST'])
+def bruteforce_test_multi_tf():
+    """
+    Multi-timeframe brute force test
+    Runs the same parameter test on multiple OHLC files (different timeframes)
+    Results combined with 'tf' column identifying each timeframe
+    """
+    try:
+        from parallel_backtest import ParallelBacktestEngine
+        import re
+
+        data = request.json
+        python_code = data.get('python_code')
+        multi_ohlc_files = data.get('multi_ohlc_files', [])  # List of {filename, content}
+        parameter_configs = data.get('parameter_configs', {})
+        parameter_metadata = data.get('parameter_metadata', {})
+
+        # Ensure Freedom filter is disabled
+        if 'useFreedomFilter' not in parameter_configs:
+            parameter_configs['useFreedomFilter'] = {
+                'from': False,
+                'to': False,
+                'default': False
+            }
+
+        if not python_code or not multi_ohlc_files or len(multi_ohlc_files) == 0:
+            return jsonify({'error': 'Python code and multiple OHLC files required'}), 400
+
+        # Execute code once to get metadata
+        namespace = {}
+        exec(python_code, namespace)
+
+        if not parameter_metadata:
+            parameter_metadata = namespace.get('PARAMETER_METADATA', {})
+
+        # Auto-fill missing parameters with defaults
+        default_params = namespace.get('DEFAULT_PARAMS', {})
+        for param_name, default_value in default_params.items():
+            if param_name not in parameter_configs:
+                parameter_configs[param_name] = {
+                    'from': default_value,
+                    'to': default_value,
+                    'default': default_value
+                }
+
+        # Generate parameter combinations once (same for all TFs)
+        combinations = generate_parameter_combinations(parameter_configs, parameter_metadata)
+
+        # Initialize progress tracking
+        global bruteforce_progress
+        bruteforce_progress = {
+            'total': len(combinations) * len(multi_ohlc_files),
+            'completed': 0,
+            'errors': 0,
+            'start_time': time.time(),
+            'is_running': True
+        }
+
+        # Process each OHLC file
+        all_results = []
+        engine = ParallelBacktestEngine(num_workers=9)
+        start_time = time.time()
+
+        for file_entry in multi_ohlc_files:
+            filename = file_entry.get('filename')
+            ohlc_content = file_entry.get('content')
+
+            if not filename or not ohlc_content:
+                continue
+
+            # Extract timeframe from filename (text before .csv extension)
+            # Using regex to match underscore-delimited timeframe
+            tf_match = re.search(r'_([a-zA-Z0-9]+)\.csv$', filename)
+            timeframe = tf_match.group(1) if tf_match else 'unknown'
+
+            # Load and normalize OHLC data
+            from io import StringIO
+            ohlc_df = pd.read_csv(StringIO(ohlc_content))
+
+            # Normalize columns
+            ohlc_df.columns = ohlc_df.columns.str.lower().str.strip()
+            col_mapping = {}
+            for idx, col in enumerate(ohlc_df.columns):
+                if idx == 0:
+                    col_mapping[col] = 'time'
+                elif idx == 1:
+                    col_mapping[col] = 'open'
+                elif idx == 2:
+                    col_mapping[col] = 'high'
+                elif idx == 3:
+                    col_mapping[col] = 'low'
+                elif idx == 4:
+                    col_mapping[col] = 'close'
+            ohlc_df.rename(columns=col_mapping, inplace=True)
+
+            if 'time' in ohlc_df.columns:
+                ohlc_df['time'] = pd.to_datetime(ohlc_df['time'])
+                if ohlc_df['time'].dt.tz is not None:
+                    ohlc_df['time'] = ohlc_df['time'].dt.tz_localize(None)
+
+            if 'volume' not in ohlc_df.columns:
+                ohlc_df['volume'] = 0
+
+            # Run parallel backtest for this TF
+            results, _ = engine.run_backtests(
+                python_code,
+                ohlc_df,
+                combinations,
+                parameter_metadata,
+                progress_callback=lambda completed, total: bruteforce_progress.update({'completed': bruteforce_progress['completed'] + 1})
+            )
+
+            # Add TF column to each result
+            for result in results:
+                result['tf'] = timeframe
+
+            all_results.extend(results)
+
+        # Sort by PnL then by TF
+        all_results_sorted = sorted(
+            all_results,
+            key=lambda x: (-x.get('total_pnl', 0), x.get('tf', ''))
+        )
+
+        # Mark test as complete
+        bruteforce_progress['is_running'] = False
+        elapsed_time = time.time() - start_time
+
+        # Calculate final stats
+        total_combinations = len(combinations) * len(multi_ohlc_files)
+        throughput_per_sec = total_combinations / elapsed_time if elapsed_time > 0 else 0
+
+        return Response(
+            json.dumps({
+                'success': True,
+                'results': all_results_sorted,
+                'note': f'⚡ Multi-TF Parallel execution ({engine.num_workers} cores) - {elapsed_time:.2f}s',
+                'implementation': 'multi-tf-parallel',
+                'execution_time': elapsed_time,
+                'stats': {
+                    'start_time': bruteforce_progress['start_time'],
+                    'end_time': time.time(),
+                    'duration_seconds': elapsed_time,
+                    'total_combinations': total_combinations,
+                    'throughput_per_sec': throughput_per_sec,
+                    'timeframes_tested': len(multi_ohlc_files)
+                }
+            }, sort_keys=False, cls=NaNEncoder),
+            mimetype='application/json'
+        )
+
+    except Exception as e:
+        return jsonify({'error': f'Multi-TF brute force error: {str(e)}'}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001, host='localhost')
