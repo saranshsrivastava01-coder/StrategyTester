@@ -617,6 +617,26 @@
             </div>
         </div>
 
+        <!-- Additional OHLC Data (Freedom Candle) Upload Section for Brute Force - Hidden by default -->
+        <div class="panel" id="bruteforce-additional-tf-section" style="display: none; margin-bottom: 20px; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.05);">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <span style="font-size: 1.2em;">🕐</span>
+                <h2 style="margin: 0;">Additional OHLC Data (Freedom Candle)</h2>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Upload OHLC data (any timeframe - higher, same, or lower) to use as Freedom Candle filter. EMAs will be calculated on this data and superimposed to the main OHLC for overlapping periods.</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    <label>Upload OHLC CSV:</label>
+                    <input type="file" id="bruteforce-additional-tf-file" accept=".csv">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button onclick="uploadBruteForceAdditionalTFFile()" style="background: #f59e0b; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">Upload OHLC Data</button>
+                    <small style="color: var(--text-secondary);">⚠️ Required when Freedom Filter is enabled</small>
+                </div>
+            </div>
+            <div id="bruteforce-additional-tf-status" class="status-message" style="margin-top: 10px;"></div>
+        </div>
+
         <!-- Parameter Configuration -->
         <div class="panel">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 15px;">
@@ -1626,6 +1646,8 @@
         let bruteForceParameters = {};
         let bruteForceMetadata = {};
         let paramConfigCollapsed = false;
+        let bruteForceAdditionalTFContent = null;
+        let bruteForceAdditionalTFFileName = null;
         let selectedImplementation = 'parallel';  // NEW: Track selected implementation (default: Parallel)
 
         // NEW: Implementation selector handler - sync both selectors
@@ -1689,6 +1711,27 @@
                 bruteForceOHLCData = await file.text();
             }
         });
+
+        document.getElementById('bruteforce-additional-tf-file')?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                bruteForceAdditionalTFContent = await file.text();
+                bruteForceAdditionalTFFileName = file.name;
+                showStatus('bruteforce-additional-tf-status', `✅ ${file.name}`, 'success');
+            }
+        });
+
+        function uploadBruteForceAdditionalTFFile() {
+            const fileInput = document.getElementById('bruteforce-additional-tf-file');
+            if (!fileInput.files[0]) {
+                showStatus('bruteforce-additional-tf-status', '❌ Please select a file', 'error');
+                return;
+            }
+            // File is already loaded via event listener, so just confirm
+            if (bruteForceAdditionalTFContent) {
+                showStatus('bruteforce-additional-tf-status', `✅ ${bruteForceAdditionalTFFileName}`, 'success');
+            }
+        }
 
         function extractBruteForceParameters() {
             if (!bruteForcePythonScript) return;
@@ -1814,6 +1857,19 @@
                         }
 
                         document.getElementById(`param-custom-value-${paramIdx}`).disabled = !isCustom;
+
+                        // Toggle additional TF section visibility for useFreedomFilter
+                        const paramNameElement = Array.from(document.querySelectorAll('.param-option')).find(
+                            el => el.dataset.param === paramIdx && el.parentElement.textContent.includes('useFreedomFilter')
+                        );
+                        if (paramNameElement) {
+                            const additionalTFSection = document.getElementById('bruteforce-additional-tf-section');
+                            if (additionalTFSection) {
+                                const isChecked = document.getElementById(`param-range-${paramIdx}`).checked ||
+                                                document.getElementById(`param-custom-${paramIdx}`).checked;
+                                additionalTFSection.style.display = isChecked ? 'block' : 'none';
+                            }
+                        }
                     });
                 });
             } else {
@@ -1921,6 +1977,12 @@
         }
 
         function startBruteForceTest(paramConfigs, metadata) {
+            // Check if Freedom Filter is enabled and additional TF data is required
+            if (paramConfigs.useFreedomFilter && paramConfigs.useFreedomFilter.from && !bruteForceAdditionalTFContent) {
+                alert('❌ Upload Additional OHLC Data (Freedom Filter is enabled)');
+                return;
+            }
+
             const resultsContainer = document.getElementById('bruteforce-results');
             resultsContainer.innerHTML = '<div style="padding: 20px;"><p style="color: var(--text-secondary); font-size: 1.1em; margin-bottom: 15px;">🔄 Test Running...</p><div id="progress-monitor" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; font-size: 0.9em; line-height: 1.8; font-family: monospace; color: var(--text-primary);"><p>Initializing test...</p></div></div>';
 
@@ -1931,6 +1993,12 @@
                 parameter_configs: paramConfigs,
                 parameter_metadata: metadata || bruteForceMetadata
             };
+
+            // Add additional TF data if provided
+            if (bruteForceAdditionalTFContent) {
+                requestData.additional_tf_content = bruteForceAdditionalTFContent;
+                requestData.additional_tf_filename = bruteForceAdditionalTFFileName;
+            }
             console.log('📤 Sending to backend:');
             console.log('   parameter_configs: ' + Object.keys(paramConfigs).length + ' parameters');
             console.log('   Params: ' + Object.keys(paramConfigs).join(', '));

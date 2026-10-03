@@ -1054,6 +1054,8 @@ def bruteforce_test():
         python_code = data.get('python_code')
         ohlc_content = data.get('ohlc_content')
         parameter_configs = data.get('parameter_configs', {})
+        additional_tf_content = data.get('additional_tf_content')
+        additional_tf_filename = data.get('additional_tf_filename')
 
         # Ensure Freedom filter is disabled to allow trades to execute
         if 'useFreedomFilter' not in parameter_configs:
@@ -1098,6 +1100,47 @@ def bruteforce_test():
 
         if 'volume' not in df.columns:
             df['volume'] = 0
+
+        # Process additional TF data if provided
+        additional_tf_df = None
+        if additional_tf_content:
+            from io import StringIO
+            csv_buffer = StringIO(additional_tf_content)
+            additional_tf_df = pd.read_csv(csv_buffer)
+
+            # Keep only first 5 columns
+            if len(additional_tf_df.columns) > 5:
+                additional_tf_df = additional_tf_df.iloc[:, :5]
+
+            # Rename columns to lowercase
+            additional_tf_df.columns = additional_tf_df.columns.str.lower().str.strip()
+
+            # Map to standard OHLC names
+            col_mapping = {}
+            for idx, col in enumerate(additional_tf_df.columns):
+                if idx == 0:
+                    col_mapping[col] = 'time'
+                elif idx == 1:
+                    col_mapping[col] = 'open'
+                elif idx == 2:
+                    col_mapping[col] = 'high'
+                elif idx == 3:
+                    col_mapping[col] = 'low'
+                elif idx == 4:
+                    col_mapping[col] = 'close'
+
+            additional_tf_df.rename(columns=col_mapping, inplace=True)
+
+            # Convert time to datetime and remove timezone
+            if 'time' in additional_tf_df.columns:
+                additional_tf_df['time'] = pd.to_datetime(additional_tf_df['time'])
+                # Remove timezone if present
+                if additional_tf_df['time'].dt.tz is not None:
+                    additional_tf_df['time'] = additional_tf_df['time'].dt.tz_localize(None)
+
+            # Add volume if missing
+            if 'volume' not in additional_tf_df.columns:
+                additional_tf_df['volume'] = 0
 
         # Load strategy
         strategy_class = StrategyOptimizer.load_strategy_from_code(python_code, "UploadedStrategy")
@@ -1158,7 +1201,13 @@ def bruteforce_test():
                     else:
                         resolved_combo[param_name] = param_value
 
-                strategy = strategy_class(df.copy(), resolved_combo)
+                # Try to pass additional_tf_df to strategy if it accepts freedom_df parameter
+                try:
+                    strategy = strategy_class(df.copy(), resolved_combo, freedom_df=additional_tf_df)
+                except TypeError:
+                    # Fallback: strategy doesn't accept freedom_df parameter
+                    strategy = strategy_class(df.copy(), resolved_combo)
+
                 result = strategy.run()
 
                 # Convert trades DataFrame to list
@@ -1534,6 +1583,8 @@ def bruteforce_test_parallel():
         ohlc_content = data.get('ohlc_content')
         parameter_configs = data.get('parameter_configs', {})
         parameter_metadata = data.get('parameter_metadata', {})
+        additional_tf_content = data.get('additional_tf_content')
+        additional_tf_filename = data.get('additional_tf_filename')
 
         # Ensure Freedom filter is disabled
         if 'useFreedomFilter' not in parameter_configs:
@@ -1572,6 +1623,47 @@ def bruteforce_test_parallel():
 
         if 'volume' not in ohlc_df.columns:
             ohlc_df['volume'] = 0
+
+        # Process additional TF data if provided
+        additional_tf_df = None
+        if additional_tf_content:
+            from io import StringIO
+            csv_buffer = StringIO(additional_tf_content)
+            additional_tf_df = pd.read_csv(csv_buffer)
+
+            # Keep only first 5 columns
+            if len(additional_tf_df.columns) > 5:
+                additional_tf_df = additional_tf_df.iloc[:, :5]
+
+            # Rename columns to lowercase
+            additional_tf_df.columns = additional_tf_df.columns.str.lower().str.strip()
+
+            # Map to standard OHLC names
+            col_mapping = {}
+            for idx, col in enumerate(additional_tf_df.columns):
+                if idx == 0:
+                    col_mapping[col] = 'time'
+                elif idx == 1:
+                    col_mapping[col] = 'open'
+                elif idx == 2:
+                    col_mapping[col] = 'high'
+                elif idx == 3:
+                    col_mapping[col] = 'low'
+                elif idx == 4:
+                    col_mapping[col] = 'close'
+
+            additional_tf_df.rename(columns=col_mapping, inplace=True)
+
+            # Convert time to datetime and remove timezone
+            if 'time' in additional_tf_df.columns:
+                additional_tf_df['time'] = pd.to_datetime(additional_tf_df['time'])
+                # Remove timezone if present
+                if additional_tf_df['time'].dt.tz is not None:
+                    additional_tf_df['time'] = additional_tf_df['time'].dt.tz_localize(None)
+
+            # Add volume if missing
+            if 'volume' not in additional_tf_df.columns:
+                additional_tf_df['volume'] = 0
 
         # Execute code to get metadata
         namespace = {}
