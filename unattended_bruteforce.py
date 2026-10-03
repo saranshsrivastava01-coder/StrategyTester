@@ -116,8 +116,10 @@ class UnattendedBruteForceEngine:
             return {'valid': False, 'error': f'CSV parsing error: {str(e)}'}
 
     def generate_combinations(self, specs):
-        """Generate parameter combinations from specs"""
-        combinations = []
+        """Generate parameter combinations from specs (matches brute force page logic)"""
+        import itertools
+
+        param_lists = {}
 
         for spec in specs:
             param_name = spec['parameter_name']
@@ -125,39 +127,26 @@ class UnattendedBruteForceEngine:
             to_val = spec['param_to']
             step = spec['param_step']
 
-            current = from_val
-            while current <= to_val:
-                combinations.append({param_name: current})
-                current += step
-
-        # Create all combinations
-        if len(specs) == 1:
-            return combinations
-
-        # Multiple parameters: create cartesian product
-        all_combos = [{}]
-        for spec in specs:
-            param_name = spec['parameter_name']
-            from_val = spec['param_from']
-            to_val = spec['param_to']
-            step = spec['param_step']
-
-            new_combos = []
-            current = from_val
             values = []
-            while current <= to_val:
-                values.append(current)
-                current += step
+            # Use epsilon for floating point tolerance (same as brute force page)
+            current = float(from_val)
+            while current <= float(to_val) + 1e-9:
+                # Round to 10 decimals to avoid precision issues
+                values.append(round(current, 10))
+                current += float(step)
 
-            for combo in all_combos:
-                for val in values:
-                    new_combo = combo.copy()
-                    new_combo[param_name] = val
-                    new_combos.append(new_combo)
+            param_lists[param_name] = values
 
-            all_combos = new_combos
+        # Generate cartesian product using itertools (same as brute force page)
+        param_names = list(param_lists.keys())
+        param_values = list(param_lists.values())
 
-        return all_combos
+        combinations = []
+        for combo_values in itertools.product(*param_values):
+            combo_dict = dict(zip(param_names, combo_values))
+            combinations.append(combo_dict)
+
+        return combinations
 
     def execute_test(self, test_sequence_id, specs):
         """Execute a single test sequence
