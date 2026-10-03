@@ -2085,5 +2085,157 @@ def bruteforce_test_multi_tf():
         return jsonify({'error': f'Multi-TF brute force error: {str(e)}'}), 500
 
 
+@app.route('/api/unattended-bruteforce-template', methods=['GET'])
+def get_unattended_template():
+    """Return CSV template for unattended brute force"""
+    template = """test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step
+TEST_001,/path/to/strategy.py,/path/to/OHLC_5min.csv,,fast_ma,5,20,5
+TEST_001,/path/to/strategy.py,/path/to/OHLC_5min.csv,,slow_ma,20,50,10
+TEST_002,/path/to/strategy.py,/path/to/OHLC_15min.csv,,threshold,10,100,10
+TEST_003,/path/to/strategy.py,/path/to/OHLC_1H.csv,/path/to/OHLC_4H.csv,parameter,1,50,5"""
+
+    return Response(
+        template,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=unattended_bruteforce_template.csv'}
+    )
+
+
+@app.route('/api/unattended-bruteforce-validate', methods=['POST'])
+def validate_unattended_csv():
+    """Validate CSV test specifications"""
+    try:
+        from unattended_bruteforce import UnattendedBruteForceEngine
+
+        csv_content = request.json.get('csv_content', '')
+
+        if not csv_content:
+            return jsonify({'error': 'CSV content is empty'}), 400
+
+        engine = UnattendedBruteForceEngine()
+        result = engine.parse_csv(csv_content)
+
+        if not result['valid']:
+            return jsonify({'valid': False, 'error': result['error']}), 400
+
+        # Count total tests and combinations
+        tests = result['tests']
+        summary = []
+        total_combos = 0
+
+        for test_id, specs in tests.items():
+            combos = engine.generate_combinations(specs)
+            total_combos += len(combos)
+            summary.append({
+                'test_sequence_id': test_id,
+                'parameter_count': len(specs),
+                'combinations': len(combos)
+            })
+
+        return jsonify({
+            'valid': True,
+            'tests': summary,
+            'total_combinations': total_combos
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Validation error: {str(e)}'}), 500
+
+
+@app.route('/api/unattended-bruteforce-execute', methods=['POST'])
+def execute_unattended_bruteforce():
+    """Execute unattended brute force tests from CSV"""
+    try:
+        from unattended_bruteforce import UnattendedBruteForceEngine
+
+        csv_content = request.json.get('csv_content', '')
+
+        if not csv_content:
+            return jsonify({'error': 'CSV content is empty'}), 400
+
+        engine = UnattendedBruteForceEngine()
+        parse_result = engine.parse_csv(csv_content)
+
+        if not parse_result['valid']:
+            return jsonify({'error': parse_result['error']}), 400
+
+        tests = parse_result['tests']
+        execution_results = {}
+
+        # Execute each test sequence
+        for test_id, specs in tests.items():
+            print(f"\n🚀 Executing test: {test_id}")
+
+            result = engine.execute_test(test_id, specs)
+
+            if result['success']:
+                # Save results CSV
+                results_path = engine.save_results(test_id, result['results'])
+                # Save statistics TXT
+                stats_path = engine.save_statistics(test_id, result['stats'], result['results'])
+
+                execution_results[test_id] = {
+                    'success': True,
+                    'results_count': len(result['results']),
+                    'duration': result['stats']['duration_seconds'],
+                    'results_file': os.path.basename(results_path),
+                    'stats_file': os.path.basename(stats_path),
+                    'results_path': results_path,
+                    'stats_path': stats_path
+                }
+
+                print(f"✅ Test {test_id} completed: {len(result['results'])} results in {result['stats']['duration_seconds']:.2f}s")
+            else:
+                execution_results[test_id] = {
+                    'success': False,
+                    'error': result['error']
+                }
+                print(f"❌ Test {test_id} failed: {result['error']}")
+
+        return jsonify({
+            'success': True,
+            'execution_results': execution_results,
+            'output_directory': engine.output_dir
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Execution error: {str(e)}'}), 500
+
+
+@app.route('/api/unattended-bruteforce-results/<test_sequence_id>', methods=['GET'])
+def get_unattended_results(test_sequence_id):
+    """Get results for a specific test sequence"""
+    try:
+        from unattended_bruteforce import UnattendedBruteForceEngine
+
+        engine = UnattendedBruteForceEngine()
+        output_dir = engine.output_dir
+
+        # Find latest results file for this test
+        import glob
+        pattern = os.path.join(output_dir, f"results_{test_sequence_id}_*.csv")
+        files = sorted(glob.glob(pattern), reverse=True)
+
+        if not files:
+            return jsonify({'error': f'No results found for {test_sequence_id}'}), 404
+
+        latest_file = files[0]
+
+        # Read and return results
+        results_df = pd.read_csv(latest_file)
+        results = results_df.to_dict(orient='records')
+
+        return jsonify({
+            'success': True,
+            'test_sequence_id': test_sequence_id,
+            'results_file': os.path.basename(latest_file),
+            'results_count': len(results),
+            'results': results
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Error retrieving results: {str(e)}'}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001, host='localhost')

@@ -374,6 +374,7 @@
             <button class="nav-tab active" onclick="switchPage('reconciliation')">🎯 Reconciliation</button>
             <button class="nav-tab" onclick="switchPage('tester')">🧪 Strategy Tester</button>
             <button class="nav-tab" onclick="switchPage('bruteforce')">⚡ Brute Force</button>
+            <button class="nav-tab" onclick="switchPage('unattended')">🤖 Unattended Brute Force</button>
         </div>
     </div>
 
@@ -741,6 +742,57 @@
                 </div>
             </div>
             <div id="bruteforce-results" style="max-height: 600px; overflow-y: auto;">
+                <p style="color: var(--text-secondary);">Results will appear here</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unattended Brute Force Page -->
+    <div id="page-unattended" style="display: none; padding: 20px;">
+        <h1>🤖 Unattended Brute Force Strategy Tester</h1>
+        <p style="color: var(--text-secondary); margin-bottom: 20px;">Upload CSV file with test specifications to run multiple brute force tests automatically</p>
+
+        <div class="panel">
+            <h2>📋 CSV Upload</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">
+                Upload a CSV file with test specifications. Each row defines a parameter range to test.
+                Multiple rows with same test_sequence_id will have parameters combined.
+            </p>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="file" id="unattended-csv-file" accept=".csv" style="flex: 1; padding: 10px; border: 2px dashed #3b82f6; border-radius: 4px; cursor: pointer;">
+                <button onclick="downloadUnattendedTemplate()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap;">📥 Download Template</button>
+            </div>
+
+            <div id="unattended-csv-preview" style="display: none; margin-bottom: 15px; padding: 15px; background: var(--bg-secondary); border-radius: 4px; max-height: 300px; overflow-y: auto;">
+                <h4 style="margin-top: 0; margin-bottom: 10px;">📄 CSV Preview</h4>
+                <pre id="unattended-csv-content" style="margin: 0; font-size: 0.8em; white-space: pre-wrap; word-wrap: break-word;"></pre>
+            </div>
+
+            <div id="unattended-validation" style="display: none; margin-bottom: 15px; padding: 15px; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #0284c7;">✅ Validation Summary</h4>
+                <div id="unattended-validation-content" style="font-size: 0.9em; color: #0c4a6e;"></div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button onclick="validateUnattendedCSV()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🔍 Validate</button>
+                <button id="unattended-execute-btn" onclick="executeUnattendedBruteForce()" style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none;">▶️ Execute</button>
+                <button onclick="clearUnattendedForm()" style="padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🗑️ Clear</button>
+            </div>
+
+            <div id="unattended-upload-status" class="status-message" style="margin-top: 10px;"></div>
+        </div>
+
+        <div class="panel" id="unattended-execution-panel" style="display: none; margin-top: 20px;">
+            <h2>⚙️ Execution Progress</h2>
+            <div id="unattended-progress" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; font-size: 0.9em; line-height: 1.8; font-family: monospace; color: var(--text-primary);">
+                <p>Initializing...</p>
+            </div>
+        </div>
+
+        <div class="panel" id="unattended-results-panel" style="display: none; margin-top: 20px;">
+            <h2>📊 Execution Results</h2>
+            <div id="unattended-results" style="background: white; padding: 15px; border-radius: 6px; max-height: 500px; overflow-y: auto;">
                 <p style="color: var(--text-secondary);">Results will appear here</p>
             </div>
         </div>
@@ -2590,6 +2642,141 @@
 
             html += '</tbody></table>';
             container.innerHTML = html;
+        }
+
+        // Unattended Brute Force Functions
+        let unattendedCSVContent = '';
+
+        function downloadUnattendedTemplate() {
+            fetch('/api/unattended-bruteforce-template')
+                .then(resp => resp.text())
+                .then(content => {
+                    const blob = new Blob([content], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'unattended_bruteforce_template.csv';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                })
+                .catch(err => alert('Error downloading template: ' + err.message));
+        }
+
+        document.getElementById('unattended-csv-file')?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                unattendedCSVContent = await file.text();
+                document.getElementById('unattended-csv-content').textContent = unattendedCSVContent;
+                document.getElementById('unattended-csv-preview').style.display = 'block';
+                document.getElementById('unattended-validation').style.display = 'none';
+                document.getElementById('unattended-execute-btn').style.display = 'none';
+                showStatus('unattended-upload-status', `✅ ${file.name} loaded`, 'success');
+            }
+        });
+
+        function validateUnattendedCSV() {
+            if (!unattendedCSVContent) {
+                alert('Please upload a CSV file first');
+                return;
+            }
+
+            fetch('/api/unattended-bruteforce-validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ csv_content: unattendedCSVContent })
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.valid) {
+                    let html = `<div>✅ Validation Passed</div><ul style="margin: 10px 0; padding-left: 20px;">`;
+                    html += `<li><strong>Tests:</strong> ${data.tests.length}</li>`;
+                    html += `<li><strong>Total Combinations:</strong> ${data.total_combinations}</li>`;
+                    html += `</ul><div style="margin-top: 10px; font-size: 0.85em; color: #0c4a6e;">`;
+
+                    data.tests.forEach(test => {
+                        html += `<div>• ${test.test_sequence_id}: ${test.combinations} combinations (${test.parameter_count} parameters)</div>`;
+                    });
+
+                    html += `</div>`;
+                    document.getElementById('unattended-validation-content').innerHTML = html;
+                    document.getElementById('unattended-validation').style.display = 'block';
+                    document.getElementById('unattended-execute-btn').style.display = 'inline-block';
+                    showStatus('unattended-upload-status', '✅ CSV validated successfully', 'success');
+                } else {
+                    showStatus('unattended-upload-status', `❌ ${data.error}`, 'error');
+                    document.getElementById('unattended-execute-btn').style.display = 'none';
+                }
+            })
+            .catch(err => {
+                showStatus('unattended-upload-status', `❌ Error: ${err.message}`, 'error');
+            });
+        }
+
+        function executeUnattendedBruteForce() {
+            if (!unattendedCSVContent) {
+                alert('Please upload a CSV file first');
+                return;
+            }
+
+            document.getElementById('unattended-execution-panel').style.display = 'block';
+            document.getElementById('unattended-results-panel').style.display = 'none';
+
+            const progressDiv = document.getElementById('unattended-progress');
+            progressDiv.innerHTML = '<p>🚀 Starting execution...</p>';
+
+            const startTime = Date.now();
+
+            fetch('/api/unattended-bruteforce-execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ csv_content: unattendedCSVContent })
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.success) {
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+                    let html = `<p>✅ Execution completed in ${elapsed}s</p>`;
+                    html += `<p style="margin: 10px 0;"><strong>Results saved to:</strong> ${data.output_directory}</p>`;
+                    html += `<div style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px;">`;
+
+                    Object.entries(data.execution_results).forEach(([testId, result]) => {
+                        if (result.success) {
+                            html += `<div style="margin-bottom: 10px; padding: 10px; background: #ecfdf5; border-radius: 4px; border-left: 3px solid #10b981;">`;
+                            html += `<strong style="color: #10b981;">✅ ${testId}</strong><br/>`;
+                            html += `Results: ${result.results_count} | Duration: ${result.duration.toFixed(2)}s<br/>`;
+                            html += `📊 ${result.results_file}<br/>`;
+                            html += `📈 ${result.stats_file}`;
+                            html += `</div>`;
+                        } else {
+                            html += `<div style="margin-bottom: 10px; padding: 10px; background: #fef2f2; border-radius: 4px; border-left: 3px solid #ef4444;">`;
+                            html += `<strong style="color: #ef4444;">❌ ${testId}</strong><br/>`;
+                            html += `Error: ${result.error}`;
+                            html += `</div>`;
+                        }
+                    });
+
+                    html += `</div>`;
+                    progressDiv.innerHTML = html;
+                    document.getElementById('unattended-results-panel').style.display = 'block';
+                } else {
+                    progressDiv.innerHTML = `<p style="color: #ef4444;">❌ Error: ${data.error}</p>`;
+                }
+            })
+            .catch(err => {
+                progressDiv.innerHTML = `<p style="color: #ef4444;">❌ Error: ${err.message}</p>`;
+            });
+        }
+
+        function clearUnattendedForm() {
+            unattendedCSVContent = '';
+            document.getElementById('unattended-csv-file').value = '';
+            document.getElementById('unattended-csv-preview').style.display = 'none';
+            document.getElementById('unattended-validation').style.display = 'none';
+            document.getElementById('unattended-execute-btn').style.display = 'none';
+            document.getElementById('unattended-execution-panel').style.display = 'none';
+            document.getElementById('unattended-results-panel').style.display = 'none';
+            document.getElementById('unattended-upload-status').innerHTML = '';
+            showStatus('unattended-upload-status', '', 'success');
         }
 
     </script>
