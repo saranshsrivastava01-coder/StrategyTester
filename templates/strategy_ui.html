@@ -749,35 +749,40 @@
 
     <!-- Unattended Brute Force Page -->
     <div id="unattended-page" class="page-content" style="padding: 20px; max-width: 1600px; margin: 0 auto;">
-        <h1>🤖 Unattended Brute Force Strategy Tester</h1>
-        <p style="color: var(--text-secondary); margin-bottom: 20px;">Upload CSV file with test specifications to run multiple brute force tests automatically</p>
+        <h1 style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">🤖 Unattended Brute Force Strategy Tester</h1>
+        <p style="color: var(--text-secondary); margin-bottom: 25px; font-size: 0.95em;">Upload CSV file with test specifications to run multiple brute force tests automatically</p>
 
         <div class="panel">
-            <h2>📋 CSV Upload</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">
-                Upload a CSV file with test specifications. Each row defines a parameter range to test.
-                Multiple rows with same test_sequence_id will have parameters combined.
-            </p>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <input type="file" id="unattended-csv-file" accept=".csv" style="flex: 1; padding: 10px; border: 2px dashed #3b82f6; border-radius: 4px; cursor: pointer;">
-                <button onclick="downloadUnattendedTemplate()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap;">📥 Download Template</button>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <h2 style="margin: 0;">📋 CSV Upload & Configuration</h2>
             </div>
 
-            <div id="unattended-csv-preview" style="display: none; margin-bottom: 15px; padding: 15px; background: var(--bg-secondary); border-radius: 4px; max-height: 300px; overflow-y: auto;">
-                <h4 style="margin-top: 0; margin-bottom: 10px;">📄 CSV Preview</h4>
-                <pre id="unattended-csv-content" style="margin: 0; font-size: 0.8em; white-space: pre-wrap; word-wrap: break-word;"></pre>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">
+                Upload a CSV file with test specifications. Rows with same <code>test_sequence_id</code> will have parameters combined (cartesian product).
+            </p>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-weight: 500;">Select CSV File:</label>
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px;">
+                    <input type="file" id="unattended-csv-file" accept=".csv" style="padding: 12px; border: 2px solid var(--input-border); border-radius: 4px; cursor: pointer; background: var(--panel-bg); color: var(--text-primary);">
+                    <button onclick="downloadUnattendedTemplate()" style="padding: 12px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap; transition: all 0.2s;">📥 Template</button>
+                </div>
+            </div>
+
+            <div id="unattended-csv-preview" style="display: none; margin-bottom: 15px; padding: 15px; background: var(--bg-secondary); border-radius: 4px; border-left: 3px solid #0284c7;">
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: #0284c7;">📄 CSV Preview</h4>
+                <pre id="unattended-csv-content" style="margin: 0; font-size: 0.75em; white-space: pre-wrap; word-wrap: break-word; max-height: 250px; overflow-y: auto; background: white; padding: 10px; border-radius: 3px;"></pre>
             </div>
 
             <div id="unattended-validation" style="display: none; margin-bottom: 15px; padding: 15px; background: #e0f2fe; border-left: 4px solid #0284c7; border-radius: 4px;">
-                <h4 style="margin-top: 0; color: #0284c7;">✅ Validation Summary</h4>
-                <div id="unattended-validation-content" style="font-size: 0.9em; color: #0c4a6e;"></div>
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: #0284c7;">✅ Validation Summary</h4>
+                <div id="unattended-validation-content" style="font-size: 0.9em; color: #0c4a6e; line-height: 1.6;"></div>
             </div>
 
-            <div style="display: flex; gap: 10px;">
-                <button onclick="validateUnattendedCSV()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🔍 Validate</button>
-                <button id="unattended-execute-btn" onclick="executeUnattendedBruteForce()" style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none;">▶️ Execute</button>
-                <button onclick="clearUnattendedForm()" style="padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🗑️ Clear</button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <button onclick="validateUnattendedCSV()" style="padding: 12px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s;">🔍 Validate</button>
+                <button id="unattended-execute-btn" onclick="executeUnattendedBruteForce()" style="padding: 12px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none; transition: all 0.2s;">▶️ Execute</button>
+                <button onclick="clearUnattendedForm()" style="padding: 12px 20px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s;">🗑️ Clear</button>
             </div>
 
             <div id="unattended-upload-status" class="status-message" style="margin-top: 10px;"></div>
@@ -785,14 +790,14 @@
 
         <div class="panel" id="unattended-execution-panel" style="display: none; margin-top: 20px;">
             <h2>⚙️ Execution Progress</h2>
-            <div id="unattended-progress" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; font-size: 0.9em; line-height: 1.8; font-family: monospace; color: var(--text-primary);">
+            <div id="unattended-progress" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; font-size: 0.9em; line-height: 1.8; font-family: monospace; color: var(--text-primary); border-left: 3px solid #10b981;">
                 <p>Initializing...</p>
             </div>
         </div>
 
         <div class="panel" id="unattended-results-panel" style="display: none; margin-top: 20px;">
             <h2>📊 Execution Results</h2>
-            <div id="unattended-results" style="background: white; padding: 15px; border-radius: 6px; max-height: 500px; overflow-y: auto;">
+            <div id="unattended-results" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; max-height: 500px; overflow-y: auto; border-left: 3px solid #10b981;">
                 <p style="color: var(--text-secondary);">Results will appear here</p>
             </div>
         </div>
