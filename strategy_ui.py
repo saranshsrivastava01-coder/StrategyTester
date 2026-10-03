@@ -1381,6 +1381,8 @@ def bruteforce_test_numba():
         ohlc_content = data.get('ohlc_content', '')
         parameter_configs = data.get('parameter_configs', {})
         parameter_metadata = data.get('parameter_metadata', {})
+        additional_tf_content = data.get('additional_tf_content')
+        additional_tf_filename = data.get('additional_tf_filename')
 
         if not python_code or not ohlc_content:
             return jsonify({'error': 'Python code and OHLC data required'}), 400
@@ -1414,6 +1416,47 @@ def bruteforce_test_numba():
 
         if 'volume' not in ohlc_df.columns:
             ohlc_df['volume'] = 0
+
+        # Process additional TF data if provided
+        additional_tf_df = None
+        if additional_tf_content:
+            from io import StringIO
+            csv_buffer = StringIO(additional_tf_content)
+            additional_tf_df = pd.read_csv(csv_buffer)
+
+            # Keep only first 5 columns
+            if len(additional_tf_df.columns) > 5:
+                additional_tf_df = additional_tf_df.iloc[:, :5]
+
+            # Rename columns to lowercase
+            additional_tf_df.columns = additional_tf_df.columns.str.lower().str.strip()
+
+            # Map to standard OHLC names
+            col_mapping_tf = {}
+            for idx, col in enumerate(additional_tf_df.columns):
+                if idx == 0:
+                    col_mapping_tf[col] = 'time'
+                elif idx == 1:
+                    col_mapping_tf[col] = 'open'
+                elif idx == 2:
+                    col_mapping_tf[col] = 'high'
+                elif idx == 3:
+                    col_mapping_tf[col] = 'low'
+                elif idx == 4:
+                    col_mapping_tf[col] = 'close'
+
+            additional_tf_df.rename(columns=col_mapping_tf, inplace=True)
+
+            # Convert time to datetime and remove timezone
+            if 'time' in additional_tf_df.columns:
+                additional_tf_df['time'] = pd.to_datetime(additional_tf_df['time'])
+                # Remove timezone if present
+                if additional_tf_df['time'].dt.tz is not None:
+                    additional_tf_df['time'] = additional_tf_df['time'].dt.tz_localize(None)
+
+            # Add volume if missing
+            if 'volume' not in additional_tf_df.columns:
+                additional_tf_df['volume'] = 0
 
         # Ensure Freedom filter is disabled to allow trades to execute (same as Current endpoint)
         if 'useFreedomFilter' not in parameter_configs:
@@ -1481,7 +1524,13 @@ def bruteforce_test_numba():
                     else:
                         resolved_params[param_name] = param_value
 
-                strategy = StrategyClass(ohlc_df.copy(), resolved_params)
+                # Try to pass freedom_df to strategy if it accepts it
+                try:
+                    strategy = StrategyClass(ohlc_df.copy(), resolved_params, freedom_df=additional_tf_df)
+                except TypeError:
+                    # Fallback: strategy doesn't accept freedom_df parameter
+                    strategy = StrategyClass(ohlc_df.copy(), resolved_params)
+
                 result = strategy.run()
 
                 # Convert trades DataFrame and calculate KPIs (same as Current endpoint)
@@ -1702,7 +1751,8 @@ def bruteforce_test_parallel():
             ohlc_df,
             combinations,
             parameter_metadata,
-            progress_callback=lambda completed, total: bruteforce_progress.update({'completed': completed})
+            progress_callback=lambda completed, total: bruteforce_progress.update({'completed': completed}),
+            freedom_df=additional_tf_df
         )
 
         # Mark test as complete

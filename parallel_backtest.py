@@ -21,7 +21,7 @@ def _run_single_backtest(args):
     Must be at module level for pickling
     """
     try:
-        python_code, ohlc_df, params, parameter_metadata = args
+        python_code, ohlc_df, params, parameter_metadata, freedom_df = args
 
         # Execute code in worker
         namespace = {}
@@ -52,7 +52,13 @@ def _run_single_backtest(args):
             else:
                 resolved_params[param_name] = param_value
 
-        strategy = StrategyClass(ohlc_df.copy(), resolved_params)
+        # Try to pass freedom_df to strategy if it accepts it
+        try:
+            strategy = StrategyClass(ohlc_df.copy(), resolved_params, freedom_df=freedom_df)
+        except TypeError:
+            # Fallback: strategy doesn't accept freedom_df parameter
+            strategy = StrategyClass(ohlc_df.copy(), resolved_params)
+
         result = strategy.run()
 
         # Calculate KPIs
@@ -116,7 +122,7 @@ class ParallelBacktestEngine:
         self.num_workers = num_workers
         print(f"⚡ Parallel Engine: Using {num_workers} worker processes")
 
-    def run_backtests(self, python_code, ohlc_df, combinations, parameter_metadata=None, progress_callback=None):
+    def run_backtests(self, python_code, ohlc_df, combinations, parameter_metadata=None, progress_callback=None, freedom_df=None):
         """
         Run multiple backtests in parallel
 
@@ -126,6 +132,7 @@ class ParallelBacktestEngine:
             combinations: List of parameter dicts
             parameter_metadata: Parameter metadata (optional)
             progress_callback: Optional callback function(completed, total) for progress updates
+            freedom_df: Additional OHLC dataframe for Freedom Candle filter (optional)
 
         Returns:
             List of results (sorted by total_pnl descending)
@@ -133,7 +140,7 @@ class ParallelBacktestEngine:
 
         # Prepare arguments for workers
         worker_args = [
-            (python_code, ohlc_df, params, parameter_metadata)
+            (python_code, ohlc_df, params, parameter_metadata, freedom_df)
             for params in combinations
         ]
 
