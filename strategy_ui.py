@@ -32,6 +32,17 @@ session_data = {
     'bf_errors': 0
 }
 
+# Global session data for tracking unattended brute force progress
+unattended_progress = {
+    'is_running': False,
+    'start_time': None,
+    'total_combinations': 0,
+    'combinations_completed': 0,
+    'current_test': '',
+    'tests_completed': 0,
+    'total_tests': 0
+}
+
 # Helper function to clean NaN values from dictionaries
 def clean_nan(obj):
     """Recursively replace NaN with None in dictionaries"""
@@ -2142,6 +2153,15 @@ def validate_unattended_csv():
         return jsonify({'error': f'Validation error: {str(e)}'}), 500
 
 
+def progress_callback(update_data):
+    """Callback for progress updates during unattended brute force"""
+    if 'current_test' in update_data:
+        unattended_progress['current_test'] = update_data['current_test']
+    if 'test_completed' in update_data:
+        unattended_progress['tests_completed'] += 1
+        unattended_progress['combinations_completed'] += update_data.get('combinations_completed', 0)
+
+
 @app.route('/api/unattended-bruteforce-execute', methods=['POST'])
 def execute_unattended_bruteforce():
     """Execute unattended brute force tests from CSV"""
@@ -2153,7 +2173,8 @@ def execute_unattended_bruteforce():
         if not csv_content:
             return jsonify({'error': 'CSV content is empty'}), 400
 
-        engine = UnattendedBruteForceEngine()
+        # Create engine with progress callback
+        engine = UnattendedBruteForceEngine(progress_callback=progress_callback)
         parse_result = engine.parse_csv(csv_content)
 
         if not parse_result['valid']:
@@ -2162,11 +2183,26 @@ def execute_unattended_bruteforce():
         tests = parse_result['tests']
         execution_results = {}
 
+        # Calculate total combinations
+        total_combinations = 0
+        for specs_list in tests.values():
+            combos = engine.generate_combinations(specs_list)
+            total_combinations += len(combos)
+
+        # Initialize progress tracking
+        unattended_progress['is_running'] = True
+        unattended_progress['start_time'] = time.time()
+        unattended_progress['total_combinations'] = total_combinations
+        unattended_progress['combinations_completed'] = 0
+        unattended_progress['current_test'] = ''
+        unattended_progress['tests_completed'] = 0
+        unattended_progress['total_tests'] = len(tests)
+
         # Execute each test sequence
         for test_id, specs in tests.items():
             print(f"\n🚀 Executing test: {test_id}")
 
-            result = engine.execute_test(test_id, specs)
+            result = engine.execute_test(test_id, specs, total_combinations)
 
             if result['success']:
                 # Save results CSV
@@ -2192,6 +2228,9 @@ def execute_unattended_bruteforce():
                 }
                 print(f"❌ Test {test_id} failed: {result['error']}")
 
+        # Mark execution as complete
+        unattended_progress['is_running'] = False
+
         return jsonify({
             'success': True,
             'execution_results': execution_results,
@@ -2199,7 +2238,35 @@ def execute_unattended_bruteforce():
         })
 
     except Exception as e:
+        unattended_progress['is_running'] = False
         return jsonify({'error': f'Execution error: {str(e)}'}), 500
+
+
+@app.route('/api/unattended-bruteforce-progress', methods=['GET'])
+def get_unattended_progress():
+    """Get current progress of unattended brute force execution"""
+    if not unattended_progress['is_running']:
+        return jsonify({'error': 'No test running'}), 400
+
+    elapsed = time.time() - unattended_progress['start_time'] if unattended_progress['start_time'] else 0
+    completed = unattended_progress['combinations_completed']
+    total = unattended_progress['total_combinations']
+    remaining = total - completed
+    rate = completed / elapsed if elapsed > 0 else 0
+    eta = remaining / rate if rate > 0 else 0
+    percentage = int((completed / total * 100)) if total > 0 else 0
+
+    return jsonify({
+        'total': total,
+        'completed': completed,
+        'remaining': remaining,
+        'percentage': percentage,
+        'rate': f'{rate:.2f}',
+        'eta_seconds': int(eta),
+        'current_test': unattended_progress['current_test'],
+        'tests_completed': unattended_progress['tests_completed'],
+        'total_tests': unattended_progress['total_tests']
+    })
 
 
 @app.route('/api/unattended-bruteforce-results/<test_sequence_id>', methods=['GET'])

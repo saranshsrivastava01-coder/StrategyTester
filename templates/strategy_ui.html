@@ -2731,6 +2731,27 @@
 
             const startTime = Date.now();
 
+            // Start polling for progress updates every 1 second
+            let progressInterval = setInterval(async () => {
+                try {
+                    const progResp = await fetch('/api/unattended-bruteforce-progress');
+                    const progData = await progResp.json();
+
+                    const elapsed = Math.round((Date.now() - startTime) / 1000);
+                    const progressHTML = `
+                        <p>⏱️ <strong>Elapsed:</strong> ${elapsed}s</p>
+                        <p>📊 <strong>Completed:</strong> ${progData.completed.toLocaleString()} / ${progData.total.toLocaleString()} (${progData.percentage}%)</p>
+                        <p>📁 <strong>Current Test:</strong> ${progData.current_test || 'Initializing...'}</p>
+                        <p>🔄 <strong>Tests Progress:</strong> ${progData.tests_completed} / ${progData.total_tests}</p>
+                        <p>⚡ <strong>Rate:</strong> ${progData.rate} combinations/sec</p>
+                        <p>🕐 <strong>ETA:</strong> ~${progData.eta_seconds}s (${Math.round(progData.eta_seconds / 60)} min)</p>
+                    `;
+                    progressDiv.innerHTML = progressHTML;
+                } catch (err) {
+                    // Progress endpoint not ready yet
+                }
+            }, 1000);
+
             fetch('/api/unattended-bruteforce-execute', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2738,6 +2759,7 @@
             })
             .then(resp => resp.json())
             .then(data => {
+                clearInterval(progressInterval);
                 if (data.success) {
                     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
                     let html = `<p>✅ Execution completed in ${elapsed}s</p>`;
@@ -2768,6 +2790,7 @@
                 }
             })
             .catch(err => {
+                clearInterval(progressInterval);
                 progressDiv.innerHTML = `<p style="color: #ef4444;">❌ Error: ${err.message}</p>`;
             });
         }

@@ -18,11 +18,12 @@ from io import StringIO
 class UnattendedBruteForceEngine:
     """Processes CSV test specifications and runs brute force tests unattended"""
 
-    def __init__(self, output_dir=None):
+    def __init__(self, output_dir=None, progress_callback=None):
         if output_dir is None:
             output_dir = os.path.join(os.path.dirname(__file__), "outputs", "unattended_results")
         self.output_dir = output_dir
         self.engine = ParallelBacktestEngine(num_workers=9)
+        self.progress_callback = progress_callback
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
     def parse_csv(self, csv_content):
@@ -148,7 +149,7 @@ class UnattendedBruteForceEngine:
 
         return combinations
 
-    def execute_test(self, test_sequence_id, specs):
+    def execute_test(self, test_sequence_id, specs, total_combinations_all=0, completed_before=0):
         """Execute a single test sequence
 
         Returns: {
@@ -224,6 +225,13 @@ class UnattendedBruteForceEngine:
             # Generate combinations
             combinations = self.generate_combinations(specs)
 
+            # Update progress: test starting
+            if self.progress_callback:
+                self.progress_callback({
+                    'current_test': test_sequence_id,
+                    'combinations_in_test': len(combinations)
+                })
+
             # Execute brute force
             start_time = time.time()
             results, elapsed_time = self.engine.run_backtests(
@@ -232,6 +240,14 @@ class UnattendedBruteForceEngine:
                 combinations,
                 freedom_df=freedom_df
             )
+
+            # Update progress: test completed
+            if self.progress_callback:
+                self.progress_callback({
+                    'test_completed': test_sequence_id,
+                    'combinations_completed': len(combinations),
+                    'total_combinations': total_combinations_all
+                })
 
             # Sort by PnL descending
             results_sorted = sorted(results, key=lambda x: x.get('total_pnl', 0), reverse=True)
