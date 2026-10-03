@@ -2285,6 +2285,19 @@ def stop_unattended_bruteforce():
         })
 
 
+@app.route('/api/unattended-bruteforce-final-results', methods=['GET'])
+def get_unattended_final_results():
+    """Get final execution results"""
+    if not unattended_progress.get('execution_results'):
+        return jsonify({'error': 'No execution results available'}), 400
+
+    return jsonify({
+        'success': True,
+        'execution_results': unattended_progress['execution_results'],
+        'output_directory': unattended_progress.get('output_directory', '')
+    })
+
+
 @app.route('/api/unattended-bruteforce-results/<test_sequence_id>', methods=['GET'])
 def get_unattended_results(test_sequence_id):
     """Get results for a specific test sequence"""
