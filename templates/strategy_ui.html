@@ -488,6 +488,26 @@
             </div>
         </div>
 
+        <!-- Additional Timeframe (Freedom Candle) Upload Section - Hidden by default -->
+        <div class="panel" id="additional-tf-section" style="display: none; margin-bottom: 20px; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.05);">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <span style="font-size: 1.2em;">🕐</span>
+                <h2 style="margin: 0;">Additional Timeframe (Freedom Candle) Data</h2>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Upload OHLC data for a higher timeframe to use as Freedom Candle filter. EMAs will be calculated on this data and superimposed to the main OHLC for overlapping periods.</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    <label>Upload Additional TF CSV:</label>
+                    <input type="file" id="additional-tf-file" accept=".csv">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button onclick="uploadAdditionalTFFile()" style="background: #f59e0b; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">Upload Additional TF</button>
+                    <small style="color: var(--text-secondary);">⚠️ Required when Freedom Candle is enabled</small>
+                </div>
+            </div>
+            <div id="additional-tf-status" class="status-message" style="margin-top: 10px;"></div>
+        </div>
+
         <!-- Parameters -->
         <div class="panel" id="tester-params-panel" style="display: none; margin-bottom: 20px; border-left: 4px solid var(--accent-color);">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
@@ -1129,6 +1149,18 @@
                 }
             }
             testerParameters[key] = value;
+
+            // Toggle Additional TF section visibility based on useFreedomCandle
+            if (key === 'useFreedomCandle') {
+                const additionalTFSection = document.getElementById('additional-tf-section');
+                if (additionalTFSection) {
+                    if (value === true || value === 'true' || value === 'True') {
+                        additionalTFSection.style.display = 'block';
+                    } else {
+                        additionalTFSection.style.display = 'none';
+                    }
+                }
+            }
         }
 
         function uploadTesterOHLCFile() {
@@ -1147,6 +1179,26 @@
             reader.readAsText(file);
         }
 
+        // Global variable for additional TF data
+        let additionalTFContent = null;
+        let additionalTFFileName = null;
+
+        function uploadAdditionalTFFile() {
+            const file = document.getElementById('additional-tf-file').files[0];
+            if (!file) {
+                showStatus('additional-tf-status', '❌ Please select a file', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                additionalTFContent = e.target.result;
+                additionalTFFileName = file.name;
+                showStatus('additional-tf-status', `✅ ${file.name}`, 'success');
+            };
+            reader.readAsText(file);
+        }
+
         function runTesterBacktest() {
             if (!testerPythonScript) {
                 showStatus('tester-ohlc-status', '❌ Upload Python strategy first', 'error');
@@ -1157,17 +1209,31 @@
                 return;
             }
 
+            // Check if Freedom Candle is enabled and Additional TF is required
+            if (testerParameters && testerParameters.useFreedomCandle && !additionalTFContent) {
+                showStatus('tester-ohlc-status', '❌ Upload Additional TF data (Freedom Candle is enabled)', 'error');
+                return;
+            }
+
             showStatus('tester-ohlc-status', '🔄 Running backtest...', 'info');
+
+            const requestBody = {
+                python_code: testerPythonScript,
+                ohlc_content: testerOHLCContent,
+                ohlc_filename: testerOHLCFileName,
+                parameters: testerParameters
+            };
+
+            // Add additional TF data if provided
+            if (additionalTFContent) {
+                requestBody.additional_tf_content = additionalTFContent;
+                requestBody.additional_tf_filename = additionalTFFileName;
+            }
 
             fetch('/api/backtest-kpis', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    python_code: testerPythonScript,
-                    ohlc_content: testerOHLCContent,
-                    ohlc_filename: testerOHLCFileName,
-                    parameters: testerParameters
-                })
+                body: JSON.stringify(requestBody)
             })
                 .then(r => r.json())
                 .then(data => {
