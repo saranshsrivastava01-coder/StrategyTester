@@ -1968,10 +1968,42 @@ def bruteforce_test_multi_tf():
             if not filename or not ohlc_content:
                 continue
 
-            # Extract timeframe from filename (text before .csv extension)
-            # Using regex to match underscore-delimited timeframe
+            # Extract timeframe from filename - try multiple patterns
+            timeframe = 'unknown'
+
+            # Pattern 1: underscore separator (OANDA_XAUUSD_5min.csv)
             tf_match = re.search(r'_([a-zA-Z0-9]+)\.csv$', filename)
-            timeframe = tf_match.group(1) if tf_match else 'unknown'
+            if tf_match:
+                timeframe = tf_match.group(1)
+            else:
+                # Pattern 2: dash separator (OANDA-XAUUSD-5min.csv)
+                tf_match = re.search(r'-([a-zA-Z0-9]+)\.csv$', filename)
+                if tf_match:
+                    timeframe = tf_match.group(1)
+                else:
+                    # Pattern 3: space separator (OANDA XAUUSD 5min.csv)
+                    tf_match = re.search(r' ([a-zA-Z0-9]+)\.csv$', filename)
+                    if tf_match:
+                        timeframe = tf_match.group(1)
+                    else:
+                        # Pattern 4: timeframe at start of filename (5min.csv, 15min.csv)
+                        tf_match = re.search(r'^([0-9]+[a-zA-Z]+)\.csv$', filename)
+                        if tf_match:
+                            timeframe = tf_match.group(1)
+                        else:
+                            # Pattern 5: last word before .csv (fallback)
+                            parts = filename.replace('-', '_').replace(' ', '_').split('_')
+                            # Find the last part that looks like a timeframe (digit+letter pattern)
+                            for part in reversed(parts):
+                                part_clean = part.replace('.csv', '')
+                                if part_clean and re.match(r'^[0-9]+[a-zA-Z]+$|^[a-zA-Z]+[0-9]+$', part_clean):
+                                    timeframe = part_clean
+                                    break
+                            # Final fallback: use last part before .csv
+                            if timeframe == 'unknown' and len(parts) > 0:
+                                last_part = parts[-1].replace('.csv', '')
+                                if last_part and len(last_part) > 0:
+                                    timeframe = last_part
 
             # Load and normalize OHLC data
             from io import StringIO

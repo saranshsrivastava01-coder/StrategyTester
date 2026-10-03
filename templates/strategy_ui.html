@@ -1802,8 +1802,32 @@
 
         // Extract timeframe from filename (text between last underscore and .csv)
         function extractTimeframe(filename) {
-            const match = filename.match(/_([^_]+)\.csv$/i);
-            return match ? match[1] : filename.replace('.csv', '');
+            // Try multiple patterns for timeframe extraction
+
+            // Pattern 1: underscore separator (OANDA_XAUUSD_5min.csv)
+            let match = filename.match(/_([a-zA-Z0-9]+)\.csv$/i);
+            if (match) return match[1];
+
+            // Pattern 2: dash separator (OANDA-XAUUSD-5min.csv)
+            match = filename.match(/-([a-zA-Z0-9]+)\.csv$/i);
+            if (match) return match[1];
+
+            // Pattern 3: space separator (OANDA XAUUSD 5min.csv)
+            match = filename.match(/ ([a-zA-Z0-9]+)\.csv$/i);
+            if (match) return match[1];
+
+            // Pattern 4: last segment that looks like timeframe
+            const parts = filename.replace(/[-_]/g, '_').replace(/ /g, '_').split('_');
+            for (let i = parts.length - 1; i >= 0; i--) {
+                const part = parts[i].replace('.csv', '');
+                // Check if it matches timeframe pattern (digit+letter or letter+digit)
+                if (part && /^[0-9]+[a-zA-Z]+$|^[a-zA-Z]+[0-9]+$/.test(part)) {
+                    return part;
+                }
+            }
+
+            // Fallback: return filename without .csv
+            return filename.replace('.csv', '').replace(/^.*[_\-\s]/, '');
         }
 
         // Handle multi-TF file uploads
