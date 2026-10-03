@@ -2171,18 +2171,26 @@ def progress_callback(update_data):
         unattended_progress['current_test'] = update_data['current_test']
     if 'test_completed' in update_data:
         unattended_progress['tests_completed'] += 1
-        unattended_progress['combinations_completed'] += update_data.get('combinations_completed', 0)
+        # Don't update combinations_completed here - engine callbacks handle it correctly
 
 
 def make_engine_progress_callback(test_id, combinations_in_test, completed_before):
     """Create an engine progress callback for real-time combination tracking"""
+    call_count = [0]  # Counter to track calls
+
     def engine_progress(completed_in_test, total_in_test):
         # Update global combinations completed count
         # completed_in_test is 0 to combinations_in_test for current test
         # completed_before is sum of all previous tests
-        unattended_progress['combinations_completed'] = completed_before + completed_in_test
+        global_completed = completed_before + completed_in_test
+        old_completed = unattended_progress['combinations_completed']
+        unattended_progress['combinations_completed'] = global_completed
         # Also update current_test so progress polling can identify which test is running
         unattended_progress['current_test'] = test_id
+
+        # Log when value changes
+        if global_completed != old_completed:
+            print(f"  📈 {test_id}: {completed_in_test}/{total_in_test} (global: {old_completed}→{global_completed})", flush=True)
     return engine_progress
 
 
