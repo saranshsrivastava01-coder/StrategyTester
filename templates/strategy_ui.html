@@ -607,8 +607,18 @@
             <h2>⚡ Brute Force Strategy Tester</h2>
             <p style="color: var(--text-secondary); margin-bottom: 20px;">Upload strategy and data, configure parameters, and run brute force testing</p>
 
-            <!-- File Uploads -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+            <!-- Single/Multi TF Mode Toggle -->
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px; padding: 15px; background: var(--table-hover); border-radius: 8px;">
+                <label style="font-weight: 600; margin: 0;">Test Mode:</label>
+                <div style="display: flex; gap: 10px;">
+                    <button id="single-tf-btn" onclick="setBruteForceMode('single')" style="padding: 8px 16px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📊 Single Timeframe</button>
+                    <button id="multi-tf-btn" onclick="setBruteForceMode('multi')" style="padding: 8px 16px; background: var(--panel-bg); color: var(--text-primary); border: 2px solid #ddd; border-radius: 4px; cursor: pointer; font-weight: bold;">🕐 Multiple Timeframes</button>
+                </div>
+                <small style="color: var(--text-secondary); margin-left: auto;">Run same parameters across different timeframes</small>
+            </div>
+
+            <!-- File Uploads - Single TF Mode -->
+            <div id="single-tf-uploads" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
                 <div class="form-group">
                     <label>Upload Python Strategy (.py):</label>
                     <input type="file" id="bruteforce-python" accept=".py">
@@ -616,6 +626,36 @@
                 <div class="form-group">
                     <label>Upload OHLC Data (.csv):</label>
                     <input type="file" id="bruteforce-ohlc" accept=".csv">
+                </div>
+            </div>
+
+            <!-- File Uploads - Multi TF Mode -->
+            <div id="multi-tf-uploads" style="display: none; margin-bottom: 30px;">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>Upload Python Strategy (.py):</label>
+                    <input type="file" id="bruteforce-python-multi" accept=".py">
+                    <small style="color: var(--text-secondary); margin-top: 5px; display: block;">Same strategy file for all timeframes</small>
+                </div>
+
+                <div style="margin-top: 20px; padding: 15px; background: var(--table-hover); border-radius: 8px;">
+                    <h3 style="margin-top: 0;">📊 Upload Multiple OHLC Files (Different Timeframes)</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 15px;">
+                        ℹ️ File naming: Include timeframe in filename before .csv (e.g., OANDA_XAUUSD_5min.csv, OANDA_XAUUSD_15min.csv, OANDA_XAUUSD_1H.csv)<br>
+                        The system will extract the timeframe from the filename automatically.
+                    </p>
+
+                    <div style="margin-bottom: 15px;">
+                        <input type="file" id="bruteforce-multi-tf-files" accept=".csv" multiple style="width: 100%; padding: 10px; border: 2px dashed #3b82f6; border-radius: 4px; cursor: pointer;">
+                    </div>
+
+                    <button onclick="uploadMultiTFFiles()" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 15px;">📤 Upload All Files</button>
+
+                    <div id="multi-tf-files-list" style="display: none; margin-top: 15px; padding: 15px; background: white; border-radius: 4px; border: 1px solid var(--border-color);">
+                        <h4 style="margin-top: 0; margin-bottom: 10px;">📋 Uploaded Files:</h4>
+                        <ul id="multi-tf-files-items" style="margin: 0; padding-left: 20px; list-style: none;"></ul>
+                    </div>
+
+                    <div id="multi-tf-upload-status" class="status-message" style="margin-top: 10px;"></div>
                 </div>
             </div>
         </div>
@@ -1662,6 +1702,11 @@
         let bruteForceAdditionalTFFileName = null;
         let selectedImplementation = 'parallel';  // NEW: Track selected implementation (default: Parallel)
 
+        // Multi-TF Mode Variables
+        let bruteForcePythonScriptMulti = null;
+        let multiTFMode = false;  // false = single TF, true = multi TF
+        let multiTFFiles = {};  // {filename: {tf: 'timeframe', content: 'csv_content'}}
+
         // NEW: Implementation selector handler - sync both selectors
         function updateImplementationMode(value) {
             selectedImplementation = value;
@@ -1709,6 +1754,108 @@
             }
         }
 
+        // Multi-TF Mode Functions
+        function setBruteForceMode(mode) {
+            multiTFMode = (mode === 'multi');
+
+            const singleBtn = document.getElementById('single-tf-btn');
+            const multiBtn = document.getElementById('multi-tf-btn');
+            const singleUploads = document.getElementById('single-tf-uploads');
+            const multiUploads = document.getElementById('multi-tf-uploads');
+
+            if (multiTFMode) {
+                // Switch to Multi TF mode
+                singleBtn.style.background = 'var(--panel-bg)';
+                singleBtn.style.color = 'var(--text-primary)';
+                singleBtn.style.borderColor = '#ddd';
+
+                multiBtn.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+                multiBtn.style.color = 'white';
+                multiBtn.style.borderColor = '#f59e0b';
+
+                singleUploads.style.display = 'none';
+                multiUploads.style.display = 'block';
+
+                // Clear single TF data
+                bruteForceOHLCData = null;
+                multiTFFiles = {};
+                document.getElementById('bruteforce-ohlc').value = '';
+            } else {
+                // Switch to Single TF mode
+                singleBtn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+                singleBtn.style.color = 'white';
+                singleBtn.style.borderColor = '#3b82f6';
+
+                multiBtn.style.background = 'var(--panel-bg)';
+                multiBtn.style.color = 'var(--text-primary)';
+                multiBtn.style.borderColor = '#ddd';
+
+                singleUploads.style.display = 'grid';
+                multiUploads.style.display = 'none';
+
+                // Clear multi TF data
+                multiTFFiles = {};
+                document.getElementById('multi-tf-files-list').style.display = 'none';
+                document.getElementById('bruteforce-multi-tf-files').value = '';
+            }
+        }
+
+        // Extract timeframe from filename (text between last underscore and .csv)
+        function extractTimeframe(filename) {
+            const match = filename.match(/_([^_]+)\.csv$/i);
+            return match ? match[1] : filename.replace('.csv', '');
+        }
+
+        // Handle multi-TF file uploads
+        function uploadMultiTFFiles() {
+            const fileInput = document.getElementById('bruteforce-multi-tf-files');
+            const files = fileInput.files;
+
+            if (files.length === 0) {
+                showStatus('multi-tf-upload-status', '❌ Select at least one CSV file', 'error');
+                return;
+            }
+
+            let processed = 0;
+            multiTFFiles = {};
+
+            for (let file of files) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const tf = extractTimeframe(file.name);
+                    multiTFFiles[file.name] = {
+                        tf: tf,
+                        content: e.target.result
+                    };
+
+                    processed++;
+                    if (processed === files.length) {
+                        // All files loaded
+                        displayMultiTFFiles();
+                        showStatus('multi-tf-upload-status', `✅ ${files.length} file(s) uploaded`, 'success');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Display uploaded multi-TF files
+        function displayMultiTFFiles() {
+            const list = document.getElementById('multi-tf-files-list');
+            const items = document.getElementById('multi-tf-files-items');
+
+            items.innerHTML = '';
+
+            for (const [filename, data] of Object.entries(multiTFFiles)) {
+                const li = document.createElement('li');
+                li.style.marginBottom = '8px';
+                li.innerHTML = `<strong>${filename}</strong> <span style="color: #f59e0b;">📊 ${data.tf}</span>`;
+                items.appendChild(li);
+            }
+
+            list.style.display = 'block';
+        }
+
         document.getElementById('bruteforce-python')?.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -1730,6 +1877,17 @@
                 bruteForceAdditionalTFContent = await file.text();
                 bruteForceAdditionalTFFileName = file.name;
                 showStatus('bruteforce-additional-tf-status', `✅ ${file.name}`, 'success');
+            }
+        });
+
+        // Multi-TF Mode - Python file listener
+        document.getElementById('bruteforce-python-multi')?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                bruteForcePythonScriptMulti = await file.text();
+                bruteForcePythonScript = bruteForcePythonScriptMulti;  // Use same script for all TFs
+                extractBruteForceParameters();
+                showStatus('multi-tf-upload-status', `✅ Strategy loaded: ${file.name}`, 'success');
             }
         });
 
