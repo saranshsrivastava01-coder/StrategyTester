@@ -149,7 +149,7 @@ class UnattendedBruteForceEngine:
 
         return combinations
 
-    def execute_test(self, test_sequence_id, specs, total_combinations_all=0, completed_before=0):
+    def execute_test(self, test_sequence_id, specs, total_combinations_all=0, completed_before=0, engine_progress_callback=None):
         """Execute a single test sequence
 
         Returns: {
@@ -232,12 +232,13 @@ class UnattendedBruteForceEngine:
                     'combinations_in_test': len(combinations)
                 })
 
-            # Execute brute force
+            # Execute brute force with progress callback
             start_time = time.time()
             results, elapsed_time = self.engine.run_backtests(
                 python_code,
                 main_ohlc_df,
                 combinations,
+                progress_callback=engine_progress_callback,
                 freedom_df=freedom_df
             )
 

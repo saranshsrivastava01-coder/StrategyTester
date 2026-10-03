@@ -2163,6 +2163,14 @@ def progress_callback(update_data):
         unattended_progress['combinations_completed'] += update_data.get('combinations_completed', 0)
 
 
+def make_engine_progress_callback(test_id, combinations_in_test, completed_before):
+    """Create an engine progress callback for real-time combination tracking"""
+    def engine_progress(completed_in_test, total_in_test):
+        # Update global combinations completed count
+        unattended_progress['combinations_completed'] = completed_before + completed_in_test
+    return engine_progress
+
+
 @app.route('/api/unattended-bruteforce-execute', methods=['POST'])
 def execute_unattended_bruteforce():
     """Execute unattended brute force tests from CSV"""
@@ -2201,6 +2209,7 @@ def execute_unattended_bruteforce():
         unattended_progress['should_stop'] = False
 
         # Execute each test sequence
+        completed_before = 0
         for test_id, specs in tests.items():
             # Check if stop was requested
             if unattended_progress['should_stop']:
@@ -2209,7 +2218,14 @@ def execute_unattended_bruteforce():
 
             print(f"\n🚀 Executing test: {test_id}")
 
-            result = engine.execute_test(test_id, specs, total_combinations)
+            # Get combinations count for this test
+            test_specs = engine.generate_combinations(specs)
+            combinations_in_test = len(test_specs)
+
+            # Create progress callback for this test
+            engine_callback = make_engine_progress_callback(test_id, combinations_in_test, completed_before)
+
+            result = engine.execute_test(test_id, specs, total_combinations, completed_before, engine_callback)
 
             if result['success']:
                 # Save results CSV
@@ -2228,12 +2244,16 @@ def execute_unattended_bruteforce():
                 }
 
                 print(f"✅ Test {test_id} completed: {len(result['results'])} results in {result['stats']['duration_seconds']:.2f}s")
+                # Update completed count for next test
+                completed_before += combinations_in_test
             else:
                 execution_results[test_id] = {
                     'success': False,
                     'error': result['error']
                 }
                 print(f"❌ Test {test_id} failed: {result['error']}")
+                # Update completed count even on failure
+                completed_before += combinations_in_test
 
         # Mark execution as complete
         unattended_progress['is_running'] = False
