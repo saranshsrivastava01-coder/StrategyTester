@@ -2686,6 +2686,7 @@
         });
 
         let validatedTests = [];
+        let testCombinationCounts = {}; // Map of test_id -> combination count
 
         function validateUnattendedCSV() {
             if (!unattendedCSVContent) {
@@ -2702,6 +2703,12 @@
             .then(data => {
                 if (data.valid) {
                     validatedTests = data.tests;
+
+                    // Store combination counts for each test
+                    testCombinationCounts = {};
+                    data.tests.forEach(test => {
+                        testCombinationCounts[test.test_sequence_id] = test.combinations;
+                    });
 
                     let html = `<div>✅ Validation Passed</div><ul style="margin: 10px 0; padding-left: 20px;">`;
                     html += `<li><strong>Tests:</strong> ${data.tests.length}</li>`;
@@ -2768,8 +2775,9 @@
         }
 
         let currentTestRunning = '';
+        let currentTestCombinations = 0;
 
-        function updateTestTile(testId, status, result = null) {
+        function updateTestTile(testId, status, result = null, progressData = null) {
             const tile = document.getElementById(`test-tile-${testId}`);
             if (!tile) return;
 
@@ -2778,7 +2786,17 @@
 
             if (status === 'running') {
                 tile.style.borderLeftColor = '#f59e0b';
-                statusDiv.innerHTML = `⏳ <span style="color: #f59e0b;">Running...</span>`;
+                let html = `<div style="color: #f59e0b; font-weight: 500; margin-bottom: 8px;">⏳ Running...</div>`;
+
+                if (progressData) {
+                    const percentage = progressData.percentage || 0;
+                    html += `<div style="font-size: 0.85em; color: #666; line-height: 1.6;">`;
+                    html += `${progressData.completed.toLocaleString()} / ${progressData.test_total.toLocaleString()} (${percentage}%)<br/>`;
+                    html += `⚡ ${progressData.rate} comb/sec`;
+                    html += `</div>`;
+                }
+
+                statusDiv.innerHTML = html;
             } else if (status === 'completed' && result) {
                 tile.style.borderLeftColor = '#10b981';
                 let html = `<div style="font-size: 0.85em; line-height: 1.6;">`;
@@ -2817,21 +2835,49 @@
                     const progResp = await fetch('/api/unattended-bruteforce-progress');
                     const progData = await progResp.json();
 
-                    // Update tile if current test changed
-                    if (progData.current_test && progData.current_test !== lastCurrentTest) {
-                        if (lastCurrentTest) {
-                            // Mark previous test as no longer running (will be updated when complete)
+                    const currentTest = progData.current_test;
+                    const testCombinations = testCombinationCounts[currentTest] || 0;
+
+                    // Calculate per-test progress
+                    let testCompleted = 0;
+                    let testPercentage = 0;
+
+                    if (currentTest && testCombinations > 0) {
+                        // Get combinations completed in previous tests
+                        let previousCombinations = 0;
+                        for (const test of validatedTests) {
+                            if (test.test_sequence_id === currentTest) break;
+                            previousCombinations += test.combinations;
                         }
-                        updateTestTile(progData.current_test, 'running');
-                        lastCurrentTest = progData.current_test;
+
+                        // Current test progress = total completed - previous tests
+                        testCompleted = progData.completed - previousCombinations;
+                        testPercentage = Math.min(100, Math.round((testCompleted / testCombinations) * 100));
+                    }
+
+                    // Update tile if current test changed
+                    if (currentTest && currentTest !== lastCurrentTest) {
+                        lastCurrentTest = currentTest;
+                        currentTestCombinations = testCombinations;
+                    }
+
+                    // Update current test tile with progress
+                    if (currentTest) {
+                        updateTestTile(currentTest, 'running', null, {
+                            completed: testCompleted,
+                            test_total: testCombinations,
+                            percentage: testPercentage,
+                            rate: progData.rate
+                        });
                     }
 
                     const elapsed = Math.round((Date.now() - startTime) / 1000);
                     const progressHTML = `
                         <p>⏱️ <strong>Elapsed:</strong> ${elapsed}s</p>
-                        <p>📊 <strong>Completed:</strong> ${progData.completed.toLocaleString()} / ${progData.total.toLocaleString()} (${progData.percentage}%)</p>
-                        <p>📁 <strong>Current Test:</strong> ${progData.current_test || 'Initializing...'}</p>
-                        <p>🔄 <strong>Tests Progress:</strong> ${progData.tests_completed} / ${progData.total_tests}</p>
+                        <p>📁 <strong>Current Test:</strong> ${currentTest || 'Initializing...'}</p>
+                        <p>📊 <strong>Test Progress:</strong> ${testCompleted.toLocaleString()} / ${testCombinations.toLocaleString()} (${testPercentage}%)</p>
+                        <p>📈 <strong>Overall Progress:</strong> ${progData.completed.toLocaleString()} / ${progData.total.toLocaleString()} (${progData.percentage}%)</p>
+                        <p>🔄 <strong>Tests:</strong> ${progData.tests_completed} / ${progData.total_tests} completed</p>
                         <p>⚡ <strong>Rate:</strong> ${progData.rate} combinations/sec</p>
                         <p>🕐 <strong>ETA:</strong> ~${progData.eta_seconds}s (${Math.round(progData.eta_seconds / 60)} min)</p>
                     `;
