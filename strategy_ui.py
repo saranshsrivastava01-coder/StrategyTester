@@ -41,7 +41,9 @@ unattended_progress = {
     'current_test': '',
     'tests_completed': 0,
     'total_tests': 0,
-    'should_stop': False
+    'should_stop': False,
+    'execution_thread': None,
+    'execution_thread_id': None
 }
 
 # Helper function to clean NaN values from dictionaries
@@ -2175,93 +2177,38 @@ def make_engine_progress_callback(test_id, combinations_in_test, completed_befor
 def execute_unattended_bruteforce():
     """Execute unattended brute force tests from CSV"""
     try:
-        from unattended_bruteforce import UnattendedBruteForceEngine
+        import threading
+        from execution_worker import run_execution
 
         csv_content = request.json.get('csv_content', '')
 
         if not csv_content:
             return jsonify({'error': 'CSV content is empty'}), 400
 
-        # Create engine with progress callback
-        engine = UnattendedBruteForceEngine(progress_callback=progress_callback)
-        parse_result = engine.parse_csv(csv_content)
-
-        if not parse_result['valid']:
-            return jsonify({'error': parse_result['error']}), 400
-
-        tests = parse_result['tests']
-        execution_results = {}
-
-        # Calculate total combinations
-        total_combinations = 0
-        for specs_list in tests.values():
-            combos = engine.generate_combinations(specs_list)
-            total_combinations += len(combos)
+        if unattended_progress['is_running']:
+            return jsonify({'error': 'Execution already in progress'}), 400
 
         # Initialize progress tracking
         unattended_progress['is_running'] = True
         unattended_progress['start_time'] = time.time()
-        unattended_progress['total_combinations'] = total_combinations
         unattended_progress['combinations_completed'] = 0
         unattended_progress['current_test'] = ''
         unattended_progress['tests_completed'] = 0
-        unattended_progress['total_tests'] = len(tests)
         unattended_progress['should_stop'] = False
+        unattended_progress['execution_results'] = {}
 
-        # Execute each test sequence
-        completed_before = 0
-        for test_id, specs in tests.items():
-            # Check if stop was requested
-            if unattended_progress['should_stop']:
-                print(f"\n⏹️ Execution stopped by user")
-                break
-
-            print(f"\n🚀 Executing test: {test_id}")
-
-            # Get combinations count for this test
-            test_specs = engine.generate_combinations(specs)
-            combinations_in_test = len(test_specs)
-
-            # Create progress callback for this test
-            engine_callback = make_engine_progress_callback(test_id, combinations_in_test, completed_before)
-
-            result = engine.execute_test(test_id, specs, total_combinations, completed_before, engine_callback)
-
-            if result['success']:
-                # Save results CSV
-                results_path = engine.save_results(test_id, result['results'])
-                # Save statistics TXT
-                stats_path = engine.save_statistics(test_id, result['stats'], result['results'])
-
-                execution_results[test_id] = {
-                    'success': True,
-                    'results_count': len(result['results']),
-                    'duration': result['stats']['duration_seconds'],
-                    'results_file': os.path.basename(results_path),
-                    'stats_file': os.path.basename(stats_path),
-                    'results_path': results_path,
-                    'stats_path': stats_path
-                }
-
-                print(f"✅ Test {test_id} completed: {len(result['results'])} results in {result['stats']['duration_seconds']:.2f}s")
-                # Update completed count for next test
-                completed_before += combinations_in_test
-            else:
-                execution_results[test_id] = {
-                    'success': False,
-                    'error': result['error']
-                }
-                print(f"❌ Test {test_id} failed: {result['error']}")
-                # Update completed count even on failure
-                completed_before += combinations_in_test
-
-        # Mark execution as complete
-        unattended_progress['is_running'] = False
+        # Start execution in background thread
+        execution_thread = threading.Thread(
+            target=run_execution,
+            args=(csv_content, progress_callback, make_engine_progress_callback, unattended_progress),
+            daemon=True
+        )
+        execution_thread.start()
+        unattended_progress['execution_thread'] = execution_thread
 
         return jsonify({
             'success': True,
-            'execution_results': execution_results,
-            'output_directory': engine.output_dir
+            'message': 'Execution started'
         })
 
     except Exception as e:
@@ -2302,11 +2249,40 @@ def stop_unattended_bruteforce():
     if not unattended_progress['is_running']:
         return jsonify({'error': 'No execution running'}), 400
 
-    unattended_progress['should_stop'] = True
-    return jsonify({
-        'success': True,
-        'message': 'Execution stop signal sent'
-    })
+    try:
+        import psutil
+        import signal
+
+        # Set stop flag
+        unattended_progress['should_stop'] = True
+
+        # Try to kill all worker processes
+        try:
+            current_process = psutil.Process(os.getpid())
+            children = current_process.children(recursive=True)
+            for child in children:
+                try:
+                    child.kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+        except Exception as e:
+            print(f"Could not kill child processes: {e}")
+
+        # Mark as stopped
+        unattended_progress['is_running'] = False
+
+        return jsonify({
+            'success': True,
+            'message': 'Execution terminated'
+        })
+
+    except Exception as e:
+        print(f"Error stopping execution: {e}")
+        unattended_progress['is_running'] = False
+        return jsonify({
+            'success': True,
+            'message': 'Execution stop requested'
+        })
 
 
 @app.route('/api/unattended-bruteforce-results/<test_sequence_id>', methods=['GET'])
