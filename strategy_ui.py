@@ -40,7 +40,8 @@ unattended_progress = {
     'combinations_completed': 0,
     'current_test': '',
     'tests_completed': 0,
-    'total_tests': 0
+    'total_tests': 0,
+    'should_stop': False
 }
 
 # Helper function to clean NaN values from dictionaries
@@ -2197,9 +2198,15 @@ def execute_unattended_bruteforce():
         unattended_progress['current_test'] = ''
         unattended_progress['tests_completed'] = 0
         unattended_progress['total_tests'] = len(tests)
+        unattended_progress['should_stop'] = False
 
         # Execute each test sequence
         for test_id, specs in tests.items():
+            # Check if stop was requested
+            if unattended_progress['should_stop']:
+                print(f"\n⏹️ Execution stopped by user")
+                break
+
             print(f"\n🚀 Executing test: {test_id}")
 
             result = engine.execute_test(test_id, specs, total_combinations)
@@ -2266,6 +2273,19 @@ def get_unattended_progress():
         'current_test': unattended_progress['current_test'],
         'tests_completed': unattended_progress['tests_completed'],
         'total_tests': unattended_progress['total_tests']
+    })
+
+
+@app.route('/api/unattended-bruteforce-stop', methods=['POST'])
+def stop_unattended_bruteforce():
+    """Stop the currently running unattended brute force execution"""
+    if not unattended_progress['is_running']:
+        return jsonify({'error': 'No execution running'}), 400
+
+    unattended_progress['should_stop'] = True
+    return jsonify({
+        'success': True,
+        'message': 'Execution stop signal sent'
     })
 
 
