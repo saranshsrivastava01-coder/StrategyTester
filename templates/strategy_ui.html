@@ -2894,14 +2894,21 @@
                     }
 
                     const elapsed = Math.round((Date.now() - startTime) / 1000);
+
+                    // Calculate per-test ETA
+                    const rate = parseFloat(progData.rate);
+                    const testRemaining = testCombinations - testCompleted;
+                    const testEta = rate > 0 ? Math.round(testRemaining / rate) : 0;
+
                     const progressHTML = `
                         <p>⏱️ <strong>Elapsed:</strong> ${elapsed}s</p>
                         <p>📁 <strong>Current Test:</strong> ${currentTest || 'Initializing...'}</p>
                         <p>📊 <strong>Test Progress:</strong> ${testCompleted.toLocaleString()} / ${testCombinations.toLocaleString()} (${testPercentage}%)</p>
+                        <p>🕐 <strong>Test ETA:</strong> ~${testEta}s (${Math.round(testEta / 60)} min)</p>
                         <p>📈 <strong>Overall Progress:</strong> ${progData.completed.toLocaleString()} / ${progData.total.toLocaleString()} (${progData.percentage}%)</p>
                         <p>🔄 <strong>Tests:</strong> ${progData.tests_completed} / ${progData.total_tests} completed</p>
                         <p>⚡ <strong>Rate:</strong> ${progData.rate} combinations/sec</p>
-                        <p>🕐 <strong>ETA:</strong> ~${progData.eta_seconds}s (${Math.round(progData.eta_seconds / 60)} min)</p>
+                        <p>🕐 <strong>Overall ETA:</strong> ~${progData.eta_seconds}s (${Math.round(progData.eta_seconds / 60)} min)</p>
                     `;
                     progressDiv.innerHTML = progressHTML;
                 } catch (err) {
