@@ -1864,14 +1864,14 @@
                 setTimeout(() => {
                     const bruteforceParams = document.getElementById('bruteforce-params');
                     if (bruteforceParams) {
-                        const paramElements = bruteforceParams.querySelectorAll('[data-param]');
-                        paramElements.forEach(el => {
-                            const paramIdx = el.dataset.param;
-                            const paramLabel = el.querySelector('label');
-                            if (paramLabel && paramLabel.textContent.includes('useFreedomFilter')) {
-                                // Found the useFreedomFilter parameter
-                                const rangeCheckbox = document.getElementById(`param-range-${paramIdx}`);
-                                const customCheckbox = document.getElementById(`param-custom-${paramIdx}`);
+                        // Find all parameter containers
+                        const paramContainers = bruteforceParams.querySelectorAll('div[style*="background: var(--table-hover)"]');
+                        paramContainers.forEach(container => {
+                            // Check if this container has 'useFreedomFilter' in its text
+                            if (container.textContent.includes('useFreedomFilter')) {
+                                // Found the useFreedomFilter parameter container
+                                const rangeCheckbox = container.querySelector('[id*="param-range-"]');
+                                const customCheckbox = container.querySelector('[id*="param-custom-"]');
 
                                 const toggleSection = () => {
                                     const additionalTFSection = document.getElementById('bruteforce-additional-tf-section');
