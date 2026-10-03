@@ -1150,8 +1150,8 @@
             }
             testerParameters[key] = value;
 
-            // Toggle Additional TF section visibility based on useFreedomCandle
-            if (key === 'useFreedomCandle') {
+            // Toggle Additional TF section visibility based on useFreedomFilter
+            if (key === 'useFreedomFilter') {
                 const additionalTFSection = document.getElementById('additional-tf-section');
                 if (additionalTFSection) {
                     if (value === true || value === 'true' || value === 'True') {
@@ -1209,9 +1209,9 @@
                 return;
             }
 
-            // Check if Freedom Candle is enabled and Additional TF is required
-            if (testerParameters && testerParameters.useFreedomCandle && !additionalTFContent) {
-                showStatus('tester-ohlc-status', '❌ Upload Additional TF data (Freedom Candle is enabled)', 'error');
+            // Check if Freedom Filter is enabled and Additional TF is required
+            if (testerParameters && testerParameters.useFreedomFilter && !additionalTFContent) {
+                showStatus('tester-ohlc-status', '❌ Upload Additional TF data (Freedom Filter is enabled)', 'error');
                 return;
             }
 
