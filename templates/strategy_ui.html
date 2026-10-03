@@ -2779,6 +2779,7 @@
 
         let currentTestRunning = '';
         let currentTestCombinations = 0;
+        let completedTests = {}; // Track which tests are completed
 
         function updateTestTile(testId, status, result = null, progressData = null) {
             const tile = document.getElementById(`test-tile-${testId}`);
@@ -2788,6 +2789,9 @@
             if (!statusDiv) return;
 
             if (status === 'running') {
+                // Don't update if this test is already marked completed
+                if (completedTests[testId]) return;
+
                 tile.style.borderLeftColor = '#f59e0b';
                 let html = `<div style="color: #f59e0b; font-weight: 500; margin-bottom: 8px;">⏳ Running...</div>`;
 
@@ -2801,6 +2805,7 @@
 
                 statusDiv.innerHTML = html;
             } else if (status === 'completed' && result) {
+                completedTests[testId] = true; // Mark as completed
                 tile.style.borderLeftColor = '#10b981';
                 let html = `<div style="font-size: 0.85em; line-height: 1.6;">`;
                 html += `<div style="color: #10b981; font-weight: 500; margin-bottom: 8px;">✅ Completed</div>`;
@@ -2812,6 +2817,7 @@
                 html += `</div></div>`;
                 statusDiv.innerHTML = html;
             } else if (status === 'error' && result) {
+                completedTests[testId] = true; // Mark as completed (with error)
                 tile.style.borderLeftColor = '#ef4444';
                 statusDiv.innerHTML = `<div style="color: #ef4444; font-weight: 500;">❌ Error</div><div style="color: #ef4444; font-size: 0.8em; margin-top: 8px;">${result.error}</div>`;
             }
@@ -2863,10 +2869,10 @@
                     // Calculate per-test progress
                     let testCompleted = 0;
                     let testPercentage = 0;
+                    let previousCombinations = 0;
 
                     if (currentTest && testCombinations > 0) {
                         // Get combinations completed in previous tests
-                        let previousCombinations = 0;
                         for (const test of validatedTests) {
                             if (test.test_sequence_id === currentTest) break;
                             previousCombinations += test.combinations;
@@ -2874,7 +2880,12 @@
 
                         // Current test progress = total completed - previous tests
                         testCompleted = progData.completed - previousCombinations;
-                        testPercentage = Math.min(100, Math.round((testCompleted / testCombinations) * 100));
+
+                        // Ensure testCompleted doesn't exceed testCombinations
+                        testCompleted = Math.min(testCompleted, testCombinations);
+
+                        // Calculate percentage
+                        testPercentage = Math.round((testCompleted / testCombinations) * 100);
                     }
 
                     // Update tile if current test changed
