@@ -18,7 +18,9 @@ from io import StringIO
 class UnattendedBruteForceEngine:
     """Processes CSV test specifications and runs brute force tests unattended"""
 
-    def __init__(self, output_dir="/tmp/unattended_results"):
+    def __init__(self, output_dir=None):
+        if output_dir is None:
+            output_dir = os.path.join(os.path.dirname(__file__), "outputs", "unattended_results")
         self.output_dir = output_dir
         self.engine = ParallelBacktestEngine(num_workers=9)
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
