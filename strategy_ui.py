@@ -2178,7 +2178,11 @@ def make_engine_progress_callback(test_id, combinations_in_test, completed_befor
     """Create an engine progress callback for real-time combination tracking"""
     def engine_progress(completed_in_test, total_in_test):
         # Update global combinations completed count
+        # completed_in_test is 0 to combinations_in_test for current test
+        # completed_before is sum of all previous tests
         unattended_progress['combinations_completed'] = completed_before + completed_in_test
+        # Also update current_test so progress polling can identify which test is running
+        unattended_progress['current_test'] = test_id
     return engine_progress
 
 
