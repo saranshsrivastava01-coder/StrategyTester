@@ -788,6 +788,12 @@
             <div id="unattended-upload-status" class="status-message" style="margin-top: 10px;"></div>
         </div>
 
+        <div class="panel" id="unattended-tests-panel" style="display: none; margin-top: 20px;">
+            <h2>📋 Test Sequences</h2>
+            <div id="unattended-tests-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+            </div>
+        </div>
+
         <div class="panel" id="unattended-execution-panel" style="display: none; margin-top: 20px;">
             <h2>⚙️ Execution Progress</h2>
             <div id="unattended-progress" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; font-size: 0.9em; line-height: 1.8; font-family: monospace; color: var(--text-primary); border-left: 3px solid #10b981;">
@@ -2679,6 +2685,8 @@
             }
         });
 
+        let validatedTests = [];
+
         function validateUnattendedCSV() {
             if (!unattendedCSVContent) {
                 alert('Please upload a CSV file first');
@@ -2693,6 +2701,8 @@
             .then(resp => resp.json())
             .then(data => {
                 if (data.valid) {
+                    validatedTests = data.tests;
+
                     let html = `<div>✅ Validation Passed</div><ul style="margin: 10px 0; padding-left: 20px;">`;
                     html += `<li><strong>Tests:</strong> ${data.tests.length}</li>`;
                     html += `<li><strong>Total Combinations:</strong> ${data.total_combinations}</li>`;
@@ -2706,15 +2716,84 @@
                     document.getElementById('unattended-validation-content').innerHTML = html;
                     document.getElementById('unattended-validation').style.display = 'block';
                     document.getElementById('unattended-execute-btn').style.display = 'inline-block';
+
+                    // Create test tiles
+                    createTestTiles(data.tests);
+
                     showStatus('unattended-upload-status', '✅ CSV validated successfully', 'success');
                 } else {
                     showStatus('unattended-upload-status', `❌ ${data.error}`, 'error');
                     document.getElementById('unattended-execute-btn').style.display = 'none';
+                    document.getElementById('unattended-tests-panel').style.display = 'none';
                 }
             })
             .catch(err => {
                 showStatus('unattended-upload-status', `❌ Error: ${err.message}`, 'error');
             });
+        }
+
+        function createTestTiles(tests) {
+            const grid = document.getElementById('unattended-tests-grid');
+            grid.innerHTML = '';
+
+            tests.forEach(test => {
+                const tile = document.createElement('div');
+                tile.id = `test-tile-${test.test_sequence_id}`;
+                tile.style.cssText = `
+                    padding: 15px;
+                    background: white;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 6px;
+                    border-left: 4px solid #667eea;
+                    transition: all 0.2s;
+                `;
+
+                tile.innerHTML = `
+                    <div style="margin-bottom: 12px;">
+                        <h3 style="margin: 0 0 8px 0; color: #333; font-size: 1.1em;">${test.test_sequence_id}</h3>
+                        <div style="font-size: 0.85em; color: #666; line-height: 1.6;">
+                            <div>📊 <strong>${test.combinations.toLocaleString()}</strong> combinations</div>
+                            <div>⚙️ <strong>${test.parameter_count}</strong> parameters</div>
+                        </div>
+                    </div>
+                    <div style="padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                        <div id="test-status-${test.test_sequence_id}" style="font-size: 0.85em; color: #667eea; font-weight: 500;">⏳ Pending</div>
+                    </div>
+                `;
+
+                grid.appendChild(tile);
+            });
+
+            document.getElementById('unattended-tests-panel').style.display = 'block';
+        }
+
+        let currentTestRunning = '';
+
+        function updateTestTile(testId, status, result = null) {
+            const tile = document.getElementById(`test-tile-${testId}`);
+            if (!tile) return;
+
+            const statusDiv = document.getElementById(`test-status-${testId}`);
+            if (!statusDiv) return;
+
+            if (status === 'running') {
+                tile.style.borderLeftColor = '#f59e0b';
+                statusDiv.innerHTML = `⏳ <span style="color: #f59e0b;">Running...</span>`;
+            } else if (status === 'completed' && result) {
+                tile.style.borderLeftColor = '#10b981';
+                let html = `<div style="font-size: 0.85em; line-height: 1.6;">`;
+                html += `<div style="color: #10b981; font-weight: 500; margin-bottom: 8px;">✅ Completed</div>`;
+                html += `<div style="color: #666;">Results: <strong>${result.results_count}</strong></div>`;
+                html += `<div style="color: #666;">Duration: <strong>${result.duration.toFixed(2)}s</strong></div>`;
+                html += `<div style="color: #666; margin-top: 8px; font-size: 0.75em;">`;
+                html += `📊 ${result.results_file}<br/>`;
+                html += `📈 ${result.stats_file}`;
+                html += `</div></div>`;
+                statusDiv.innerHTML = html;
+            } else if (status === 'error' && result) {
+                tile.style.borderLeftColor = '#ef4444';
+                statusDiv.innerHTML = `<div style="color: #ef4444; font-weight: 500;">❌ Error</div><div style="color: #ef4444; font-size: 0.8em; margin-top: 8px;">${result.error}</div>`;
+            }
         }
 
         function executeUnattendedBruteForce() {
@@ -2730,12 +2809,22 @@
             progressDiv.innerHTML = '<p>🚀 Starting execution...</p>';
 
             const startTime = Date.now();
+            let lastCurrentTest = '';
 
             // Start polling for progress updates every 1 second
             let progressInterval = setInterval(async () => {
                 try {
                     const progResp = await fetch('/api/unattended-bruteforce-progress');
                     const progData = await progResp.json();
+
+                    // Update tile if current test changed
+                    if (progData.current_test && progData.current_test !== lastCurrentTest) {
+                        if (lastCurrentTest) {
+                            // Mark previous test as no longer running (will be updated when complete)
+                        }
+                        updateTestTile(progData.current_test, 'running');
+                        lastCurrentTest = progData.current_test;
+                    }
 
                     const elapsed = Math.round((Date.now() - startTime) / 1000);
                     const progressHTML = `
@@ -2761,6 +2850,15 @@
             .then(data => {
                 clearInterval(progressInterval);
                 if (data.success) {
+                    // Update all test tiles with final results
+                    Object.entries(data.execution_results).forEach(([testId, result]) => {
+                        if (result.success) {
+                            updateTestTile(testId, 'completed', result);
+                        } else {
+                            updateTestTile(testId, 'error', result);
+                        }
+                    });
+
                     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
                     let html = `<p>✅ Execution completed in ${elapsed}s</p>`;
                     html += `<p style="margin: 10px 0;"><strong>Results saved to:</strong> ${data.output_directory}</p>`;
@@ -2797,10 +2895,12 @@
 
         function clearUnattendedForm() {
             unattendedCSVContent = '';
+            validatedTests = [];
             document.getElementById('unattended-csv-file').value = '';
             document.getElementById('unattended-csv-preview').style.display = 'none';
             document.getElementById('unattended-validation').style.display = 'none';
             document.getElementById('unattended-execute-btn').style.display = 'none';
+            document.getElementById('unattended-tests-panel').style.display = 'none';
             document.getElementById('unattended-execution-panel').style.display = 'none';
             document.getElementById('unattended-results-panel').style.display = 'none';
             document.getElementById('unattended-upload-status').innerHTML = '';
