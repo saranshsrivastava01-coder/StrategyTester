@@ -25,6 +25,15 @@ class NaNEncoder(json.JSONEncoder):
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
+# Initialize execution state on startup
+@app.before_request
+def reset_stale_execution():
+    """Reset execution state if thread is dead"""
+    if unattended_progress['is_running'] and unattended_progress['execution_thread']:
+        if not unattended_progress['execution_thread'].is_alive():
+            unattended_progress['is_running'] = False
+            unattended_progress['should_stop'] = False
+
 # Global session data for tracking brute force progress
 session_data = {
     'bf_total': 0,
@@ -2184,6 +2193,12 @@ def execute_unattended_bruteforce():
 
         if not csv_content:
             return jsonify({'error': 'CSV content is empty'}), 400
+
+        # Check if there's a stale execution (thread is dead but flag is still on)
+        if unattended_progress['is_running'] and unattended_progress['execution_thread']:
+            if not unattended_progress['execution_thread'].is_alive():
+                unattended_progress['is_running'] = False
+                unattended_progress['should_stop'] = False
 
         if unattended_progress['is_running']:
             return jsonify({'error': 'Execution already in progress'}), 400
