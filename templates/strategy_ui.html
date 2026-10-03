@@ -1230,9 +1230,18 @@
             }
 
             // Check if Freedom Filter is enabled and Additional TF is required
-            if (testerParameters && testerParameters.useFreedomFilter && !additionalTFContent) {
-                showStatus('tester-ohlc-status', '❌ Upload Additional TF data (Freedom Filter is enabled)', 'error');
-                return;
+            // Only require additional TF data if useFreedomFilter is actually set to true
+            if (testerParameters && testerParameters.useFreedomFilter) {
+                const isFreedomFilterTrue = testerParameters.useFreedomFilter === true ||
+                                           testerParameters.useFreedomFilter === 'True' ||
+                                           testerParameters.useFreedomFilter === 'true' ||
+                                           testerParameters.useFreedomFilter === 1 ||
+                                           testerParameters.useFreedomFilter === '1';
+
+                if (isFreedomFilterTrue && !additionalTFContent) {
+                    showStatus('tester-ohlc-status', '❌ Upload Additional TF data (Freedom Filter is enabled)', 'error');
+                    return;
+                }
             }
 
             showStatus('tester-ohlc-status', '🔄 Running backtest...', 'info');
@@ -1997,9 +2006,15 @@
 
         function startBruteForceTest(paramConfigs, metadata) {
             // Check if Freedom Filter is enabled and additional TF data is required
-            if (paramConfigs.useFreedomFilter && paramConfigs.useFreedomFilter.from && !bruteForceAdditionalTFContent) {
-                alert('❌ Upload Additional OHLC Data (Freedom Filter is enabled)');
-                return;
+            // Only require additional TF data if useFreedomFilter is actually set to true
+            if (paramConfigs.useFreedomFilter) {
+                const fromValue = paramConfigs.useFreedomFilter.from;
+                const isFreedomFilterTrue = fromValue === true || fromValue === 'True' || fromValue === 'true' || fromValue === 1 || fromValue === '1';
+
+                if (isFreedomFilterTrue && !bruteForceAdditionalTFContent) {
+                    alert('❌ Upload Additional OHLC Data (Freedom Filter is enabled)');
+                    return;
+                }
             }
 
             const resultsContainer = document.getElementById('bruteforce-results');
