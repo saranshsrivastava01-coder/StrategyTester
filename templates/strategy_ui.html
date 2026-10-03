@@ -2067,6 +2067,17 @@
         }
 
         async function runBruteForceTest() {
+            // Check which mode we're in
+            if (multiTFMode) {
+                // Multi-TF mode
+                if (!bruteForcePythonScriptMulti || Object.keys(multiTFFiles).length === 0) {
+                    alert('Please upload both Python strategy and multiple OHLC files');
+                    return;
+                }
+                return runMultiTFBruteForceTest();
+            }
+
+            // Single TF mode
             if (!bruteForcePythonScript || !bruteForceOHLCData) {
                 alert('Please upload both Python strategy and OHLC data');
                 return;
@@ -2107,6 +2118,113 @@
             } catch (err) {
                 alert('Error calculating combinations: ' + err.message);
             }
+        }
+
+        async function runMultiTFBruteForceTest() {
+            // Collect parameter configs
+            const { configs: paramConfigs, customSteps } = collectParameterConfigs();
+
+            // Merge custom steps into metadata
+            const metadataWithCustomSteps = { ...bruteForceMetadata };
+            Object.keys(customSteps).forEach(paramName => {
+                if (!metadataWithCustomSteps[paramName]) {
+                    metadataWithCustomSteps[paramName] = {};
+                }
+                metadataWithCustomSteps[paramName].step = customSteps[paramName];
+            });
+
+            try {
+                // Convert multiTFFiles object to array format for API
+                const filesArray = Object.entries(multiTFFiles).map(([filename, data]) => ({
+                    filename: filename,
+                    content: data.content
+                }));
+
+                const calcResp = await fetch('/api/calculate-combinations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ parameter_configs: paramConfigs, parameter_metadata: metadataWithCustomSteps })
+                });
+
+                const calcData = await calcResp.json();
+                const totalCombos = calcData.total_combinations;
+                const totalPerTF = calcData.total_combinations;
+                const totalAcrossAllTFs = totalPerTF * filesArray.length;
+
+                // Show confirmation dialog
+                const confirmed = confirm(`⚠️ This will test:\n- ${totalPerTF.toLocaleString()} combinations per timeframe\n- Across ${filesArray.length} timeframes\n- Total: ${totalAcrossAllTFs.toLocaleString()} executions\n\nClick OK to start execution.`);
+
+                if (!confirmed) {
+                    return;
+                }
+
+                // Start multi-TF test
+                startMultiTFBruteForceTest(paramConfigs, metadataWithCustomSteps, filesArray);
+
+            } catch (err) {
+                alert('Error calculating combinations: ' + err.message);
+            }
+        }
+
+        function startMultiTFBruteForceTest(paramConfigs, metadata, filesArray) {
+            const resultsContainer = document.getElementById('bruteforce-results');
+            resultsContainer.innerHTML = '<div style="padding: 20px;"><p style="color: var(--text-secondary); font-size: 1.1em; margin-bottom: 15px;">🔄 Multi-TF Test Running...</p><div id="progress-monitor" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; font-size: 0.9em; line-height: 1.8; font-family: monospace; color: var(--text-primary);"><p>Initializing multi-TF test...</p></div></div>';
+
+            // Prepare request data
+            const requestData = {
+                python_code: bruteForcePythonScriptMulti,
+                multi_ohlc_files: filesArray,
+                parameter_configs: paramConfigs,
+                parameter_metadata: metadata || bruteForceMetadata
+            };
+
+            console.log('📤 Sending multi-TF request:');
+            console.log('   Timeframes: ' + filesArray.length);
+            console.log('   Files: ' + filesArray.map(f => f.filename).join(', '));
+            console.log('   Parameters: ' + Object.keys(paramConfigs).length);
+
+            const startTime = Date.now();
+
+            // Start progress monitoring
+            let progressInterval = setInterval(async () => {
+                try {
+                    const progResp = await fetch('/api/bruteforce-progress');
+                    const progData = await progResp.json();
+
+                    const elapsed = Math.round((Date.now() - startTime) / 1000);
+                    const progressHTML = `
+                        <p>⏱️ <strong>Elapsed:</strong> ${elapsed}s</p>
+                        <p>📊 <strong>Completed:</strong> ${progData.completed.toLocaleString()} / ${progData.total.toLocaleString()} (${progData.percentage}%)</p>
+                        <p>❌ <strong>Errors:</strong> ${progData.errors}</p>
+                        <p>📈 <strong>Remaining:</strong> ${progData.remaining.toLocaleString()}</p>
+                        <p>⚡ <strong>Rate:</strong> ${progData.rate} combinations/sec</p>
+                        <p>🕐 <strong>ETA:</strong> ~${progData.eta_seconds}s (${Math.round(progData.eta_seconds / 60)} min)</p>
+                    `;
+                    document.getElementById('progress-monitor').innerHTML = progressHTML;
+                } catch (err) {
+                    // Progress endpoint not ready yet
+                }
+            }, 1000);
+
+            // Call multi-TF endpoint
+            fetch('/api/bruteforce-test-multi-tf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                if (data.error) {
+                    resultsContainer.innerHTML = `<p style="color: #ef4444;">❌ Error: ${data.error}</p>`;
+                } else {
+                    displayBruteForceResults(data);
+                }
+            })
+            .catch(err => {
+                clearInterval(progressInterval);
+                resultsContainer.innerHTML = `<p style="color: #ef4444;">❌ Error: ${err.message}</p>`;
+            });
         }
 
         function collectParameterConfigs() {
@@ -2269,8 +2387,15 @@
         }
 
         function downloadCSV(results, filename) {
+            // Check if results include timeframe column (multi-TF mode)
+            const hasTimeframe = results.length > 0 && results[0].tf !== undefined;
+
             // Prepare CSV headers
-            const headers = ['Rank', 'Parameters', 'Total Trades', 'Winning Trades', 'Losing Trades', 'Win Rate (%)', 'Max Profit', 'Max Loss', 'Total PnL', 'Max Drawdown', 'Profit Factor'];
+            let headers = ['Rank'];
+            if (hasTimeframe) {
+                headers.push('Timeframe');
+            }
+            headers.push('Parameters', 'Total Trades', 'Winning Trades', 'Losing Trades', 'Win Rate (%)', 'Max Profit', 'Max Loss', 'Total PnL', 'Max Drawdown', 'Profit Factor');
 
             // Prepare CSV rows
             const rows = results.map((result, idx) => {
@@ -2278,8 +2403,11 @@
                     .map(([k, v]) => `${k}=${v}`)
                     .join(' | ');
 
-                return [
-                    idx + 1,
+                let row = [idx + 1];
+                if (hasTimeframe) {
+                    row.push(result.tf || 'unknown');
+                }
+                row.push(
                     paramStr,
                     result.total_trades,
                     result.winning_trades,
@@ -2290,7 +2418,8 @@
                     result.total_pnl.toFixed(2),
                     (result.max_drawdown || 0).toFixed(2),
                     (result.profit_factor || 0).toFixed(4)
-                ];
+                );
+                return row;
             });
 
             // Create CSV content
@@ -2365,6 +2494,9 @@
             // Sort by total_pnl descending
             results.sort((a, b) => b.total_pnl - a.total_pnl);
 
+            // Check if results include timeframe column (multi-TF mode)
+            const hasTimeframe = results.length > 0 && results[0].tf !== undefined;
+
             // Show the download button
             document.getElementById('bruteforce-download-btn').style.display = 'block';
 
@@ -2386,6 +2518,7 @@
                             <div><strong>Total Combinations:</strong> ${stats.total_combinations.toLocaleString()}</div>
                             <div><strong>Throughput:</strong> ${stats.throughput_per_sec.toFixed(2)} combos/sec</div>
                             <div><strong>Results Found:</strong> ${results.length.toLocaleString()}</div>
+                            ${stats.timeframes_tested ? `<div><strong>Timeframes Tested:</strong> ${stats.timeframes_tested}</div>` : ''}
                         </div>
                     </div>
                 `;
@@ -2393,6 +2526,7 @@
 
             let html = statsHtml + `<table class="kpi-table" style="width: 100%; font-size: 0.85em;">
                 <thead><tr>
+                    ${hasTimeframe ? '<th style="width: 60px; text-align: center;">TF</th>' : ''}
                     <th style="width: 100px; text-align: center;">Parameters</th>
                     <th style="width: 60px; text-align: center;">Trades</th>
                     <th style="width: 60px; text-align: center;">Wins</th>
@@ -2416,6 +2550,7 @@
                     .join(', ');
 
                 html += `<tr style="border-bottom: 1px solid var(--border-color);">
+                    ${hasTimeframe ? `<td style="text-align: center; font-weight: bold; color: var(--accent-color);">${result.tf || 'unknown'}</td>` : ''}
                     <td style="text-align: center; font-family: monospace; font-size: 0.8em;">${paramStr}</td>
                     <td style="text-align: center;">${result.total_trades}</td>
                     <td style="text-align: center; color: var(--success-color);">${result.winning_trades}</td>
