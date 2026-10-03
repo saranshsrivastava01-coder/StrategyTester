@@ -1857,21 +1857,40 @@
                         }
 
                         document.getElementById(`param-custom-value-${paramIdx}`).disabled = !isCustom;
-
-                        // Toggle additional TF section visibility for useFreedomFilter
-                        const paramNameElement = Array.from(document.querySelectorAll('.param-option')).find(
-                            el => el.dataset.param === paramIdx && el.parentElement.textContent.includes('useFreedomFilter')
-                        );
-                        if (paramNameElement) {
-                            const additionalTFSection = document.getElementById('bruteforce-additional-tf-section');
-                            if (additionalTFSection) {
-                                const isChecked = document.getElementById(`param-range-${paramIdx}`).checked ||
-                                                document.getElementById(`param-custom-${paramIdx}`).checked;
-                                additionalTFSection.style.display = isChecked ? 'block' : 'none';
-                            }
-                        }
                     });
                 });
+
+                // Add specific listener for useFreedomFilter parameter to toggle additional TF section
+                setTimeout(() => {
+                    const bruteforceParams = document.getElementById('bruteforce-params');
+                    if (bruteforceParams) {
+                        const paramElements = bruteforceParams.querySelectorAll('[data-param]');
+                        paramElements.forEach(el => {
+                            const paramIdx = el.dataset.param;
+                            const paramLabel = el.querySelector('label');
+                            if (paramLabel && paramLabel.textContent.includes('useFreedomFilter')) {
+                                // Found the useFreedomFilter parameter
+                                const rangeCheckbox = document.getElementById(`param-range-${paramIdx}`);
+                                const customCheckbox = document.getElementById(`param-custom-${paramIdx}`);
+
+                                const toggleSection = () => {
+                                    const additionalTFSection = document.getElementById('bruteforce-additional-tf-section');
+                                    if (additionalTFSection) {
+                                        const isEnabled = (rangeCheckbox && rangeCheckbox.checked) ||
+                                                         (customCheckbox && customCheckbox.checked);
+                                        additionalTFSection.style.display = isEnabled ? 'block' : 'none';
+                                    }
+                                };
+
+                                if (rangeCheckbox) rangeCheckbox.addEventListener('change', toggleSection);
+                                if (customCheckbox) customCheckbox.addEventListener('change', toggleSection);
+
+                                // Initial state
+                                toggleSection();
+                            }
+                        });
+                    }
+                }, 100);
             } else {
                 container.innerHTML = '<p style="color: var(--text-secondary); grid-column: 1/-1;">Could not parse parameters</p>';
             }
