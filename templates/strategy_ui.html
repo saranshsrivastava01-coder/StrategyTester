@@ -488,21 +488,21 @@
             </div>
         </div>
 
-        <!-- Additional Timeframe (Freedom Candle) Upload Section - Hidden by default -->
+        <!-- Additional OHLC Data (Freedom Candle) Upload Section - Hidden by default -->
         <div class="panel" id="additional-tf-section" style="display: none; margin-bottom: 20px; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.05);">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
                 <span style="font-size: 1.2em;">🕐</span>
-                <h2 style="margin: 0;">Additional Timeframe (Freedom Candle) Data</h2>
+                <h2 style="margin: 0;">Additional OHLC Data (Freedom Candle)</h2>
             </div>
-            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Upload OHLC data for a higher timeframe to use as Freedom Candle filter. EMAs will be calculated on this data and superimposed to the main OHLC for overlapping periods.</p>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Upload OHLC data (any timeframe - higher, same, or lower) to use as Freedom Candle filter. EMAs will be calculated on this data and superimposed to the main OHLC for overlapping periods.</p>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                 <div class="form-group">
-                    <label>Upload Additional TF CSV:</label>
+                    <label>Upload OHLC CSV:</label>
                     <input type="file" id="additional-tf-file" accept=".csv">
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <button onclick="uploadAdditionalTFFile()" style="background: #f59e0b; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">Upload Additional TF</button>
-                    <small style="color: var(--text-secondary);">⚠️ Required when Freedom Candle is enabled</small>
+                    <button onclick="uploadAdditionalTFFile()" style="background: #f59e0b; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">Upload OHLC Data</button>
+                    <small style="color: var(--text-secondary);">⚠️ Required when Freedom Filter is enabled</small>
                 </div>
             </div>
             <div id="additional-tf-status" class="status-message" style="margin-top: 10px;"></div>
