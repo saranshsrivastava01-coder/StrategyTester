@@ -2863,6 +2863,43 @@
                     const progResp = await fetch('/api/unattended-bruteforce-progress');
                     const progData = await progResp.json();
 
+                    // Check if execution is complete (endpoint returns error)
+                    if (progData.error) {
+                        clearInterval(progressInterval);
+
+                        // Fetch final results and show 100% completion
+                        const finalResp = await fetch('/api/unattended-bruteforce-final-results');
+                        const finalData = await finalResp.json();
+
+                        // Mark all tests as completed with 100%
+                        for (const test of validatedTests) {
+                            updateTestTile(test.test_sequence_id, 'completed', null, {
+                                completed: test.combinations,
+                                test_total: test.combinations,
+                                percentage: 100,
+                                rate: '0.00'
+                            });
+                        }
+
+                        const elapsed = Math.round((Date.now() - startTime) / 1000);
+                        const progressHTML = `
+                            <p>✅ <strong>Execution Complete!</strong></p>
+                            <p>⏱️ <strong>Total Time:</strong> ${elapsed}s</p>
+                            <p>📈 <strong>Overall Progress:</strong> ${progData.total.toLocaleString()} / ${progData.total.toLocaleString()} (100%)</p>
+                            <p>🔄 <strong>Tests:</strong> ${progData.total_tests} / ${progData.total_tests} completed</p>
+                        `;
+                        progressDiv.innerHTML = progressHTML;
+
+                        // Show results panel after a short delay
+                        setTimeout(() => {
+                            document.getElementById('unattended-execution-panel').style.display = 'none';
+                            document.getElementById('unattended-results-panel').style.display = 'block';
+                            document.getElementById('unattended-stop-btn').style.display = 'none';
+                        }, 500);
+
+                        return;
+                    }
+
                     const currentTest = progData.current_test;
                     const testCombinations = testCombinationCounts[currentTest] || 0;
 
@@ -2923,7 +2960,7 @@
                     `;
                     progressDiv.innerHTML = progressHTML;
                 } catch (err) {
-                    // Progress endpoint not ready yet
+                    // Silently ignore fetch errors (network issues, etc)
                 }
             }, 1000);
 
