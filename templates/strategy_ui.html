@@ -2804,17 +2804,28 @@
                 }
 
                 statusDiv.innerHTML = html;
-            } else if (status === 'completed' && result) {
-                completedTests[testId] = true; // Mark as completed
+            } else if (status === 'completed') {
+                // Mark as completed (works with or without result data)
+                completedTests[testId] = true;
                 tile.style.borderLeftColor = '#10b981';
+
                 let html = `<div style="font-size: 0.85em; line-height: 1.6;">`;
                 html += `<div style="color: #10b981; font-weight: 500; margin-bottom: 8px;">✅ Completed</div>`;
-                html += `<div style="color: #666;">Results: <strong>${result.results_count}</strong></div>`;
-                html += `<div style="color: #666;">Duration: <strong>${result.duration.toFixed(2)}s</strong></div>`;
-                html += `<div style="color: #666; margin-top: 8px; font-size: 0.75em;">`;
-                html += `📊 ${result.results_file}<br/>`;
-                html += `📈 ${result.stats_file}`;
-                html += `</div></div>`;
+
+                // If result data available, show detailed results
+                if (result) {
+                    html += `<div style="color: #666;">Results: <strong>${result.results_count}</strong></div>`;
+                    html += `<div style="color: #666;">Duration: <strong>${result.duration.toFixed(2)}s</strong></div>`;
+                    html += `<div style="color: #666; margin-top: 8px; font-size: 0.75em;">`;
+                    html += `📊 ${result.results_file}<br/>`;
+                    html += `📈 ${result.stats_file}`;
+                    html += `</div>`;
+                } else if (progressData) {
+                    // If only progress data available, show progress
+                    html += `<div style="color: #666;">Completed: <strong>${progressData.completed.toLocaleString()} / ${progressData.test_total.toLocaleString()}</strong></div>`;
+                }
+
+                html += `</div>`;
                 statusDiv.innerHTML = html;
             } else if (status === 'error' && result) {
                 completedTests[testId] = true; // Mark as completed (with error)
@@ -2871,9 +2882,17 @@
                         const finalResp = await fetch('/api/unattended-bruteforce-final-results');
                         const finalData = await finalResp.json();
 
-                        // Mark all tests as completed with 100%
+                        // Mark all tests as completed with their final results
                         for (const test of validatedTests) {
-                            updateTestTile(test.test_sequence_id, 'completed', null, {
+                            const testResults = finalData.execution_results?.[test.test_sequence_id];
+                            const resultData = testResults ? {
+                                results_count: testResults.results_count,
+                                duration: testResults.duration,
+                                results_file: testResults.results_file,
+                                stats_file: testResults.stats_file
+                            } : null;
+
+                            updateTestTile(test.test_sequence_id, 'completed', resultData, {
                                 completed: test.combinations,
                                 test_total: test.combinations,
                                 percentage: 100,
