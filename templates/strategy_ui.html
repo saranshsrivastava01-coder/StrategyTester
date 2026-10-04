@@ -2927,6 +2927,18 @@
 
                     // Update tile if current test changed
                     if (currentTest && currentTest !== lastCurrentTest) {
+                        // Mark the PREVIOUS test as completed
+                        if (lastCurrentTest) {
+                            const prevTestCombinations = testCombinationCounts[lastCurrentTest] || 0;
+                            updateTestTile(lastCurrentTest, 'completed', null, {
+                                completed: prevTestCombinations,
+                                test_total: prevTestCombinations,
+                                percentage: 100,
+                                rate: '0.00'
+                            });
+                        }
+
+                        // Update to new test
                         lastCurrentTest = currentTest;
                         currentTestCombinations = testCombinations;
                     }
