@@ -375,6 +375,7 @@
             <button class="nav-tab" onclick="switchPage('tester')">🧪 Strategy Tester</button>
             <button class="nav-tab" onclick="switchPage('bruteforce')">⚡ Brute Force</button>
             <button class="nav-tab" onclick="switchPage('unattended')">🤖 Unattended Brute Force</button>
+            <button class="nav-tab" onclick="switchPage('add-data')">➕ Add Data</button>
         </div>
     </div>
 
@@ -809,6 +810,89 @@
             <div id="unattended-results" style="background: var(--bg-secondary); padding: 15px; border-radius: 6px; max-height: 500px; overflow-y: auto; border-left: 3px solid #10b981;">
                 <p style="color: var(--text-secondary);">Results will appear here</p>
             </div>
+        </div>
+    </div>
+
+    <!-- Add Unattended Data Page -->
+    <div id="add-data-page" class="page-content" style="padding: 20px; max-width: 1400px; margin: 0 auto;">
+        <h1 style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">➕ Add Unattended Test Data</h1>
+        <p style="color: var(--text-secondary); margin-bottom: 25px; font-size: 0.95em;">Build CSV templates for unattended brute force testing with an easy-to-use form</p>
+
+        <div class="panel" style="margin-bottom: 20px;">
+            <h2 style="margin-bottom: 15px;">📝 Add Test Row</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Test Sequence ID *</label>
+                    <input type="text" id="add-test-id" placeholder="e.g., TEST_001" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Python Strategy File *</label>
+                    <input type="text" id="add-python-path" placeholder="/path/to/strategy.py" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Main OHLC File *</label>
+                    <input type="text" id="add-ohlc-path" placeholder="/path/to/ohlc.csv" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Additional OHLC File (Optional)</label>
+                    <input type="text" id="add-additional-ohlc" placeholder="/path/to/additional.csv" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Parameter Name *</label>
+                    <input type="text" id="add-param-name" placeholder="e.g., length, mult" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                </div>
+                <div></div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">From *</label>
+                    <input type="number" id="add-param-from" placeholder="1" step="0.1" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">To *</label>
+                    <input type="number" id="add-param-to" placeholder="100" step="0.1" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Step *</label>
+                    <input type="number" id="add-param-step" placeholder="1" step="0.1" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                <button onclick="addDataRow()" style="padding: 12px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s;">➕ Add Row</button>
+                <button onclick="clearAddDataForm()" style="padding: 12px 20px; background: #94a3b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s;">🔄 Reset</button>
+                <div id="add-data-status" style="padding: 12px 20px; display: none; border-radius: 4px; background: #d1fae5; color: #065f46; font-weight: 500;"></div>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-bottom: 20px;">
+            <h2 style="margin-bottom: 15px;">📊 Test Rows Preview</h2>
+            <div id="add-data-table-container" style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85em;">
+                    <thead>
+                        <tr style="background: var(--bg-secondary); border-bottom: 2px solid var(--border-color);">
+                            <th style="padding: 10px; text-align: left; color: var(--text-secondary);">Test ID</th>
+                            <th style="padding: 10px; text-align: left; color: var(--text-secondary);">Parameter</th>
+                            <th style="padding: 10px; text-align: left; color: var(--text-secondary);">From</th>
+                            <th style="padding: 10px; text-align: left; color: var(--text-secondary);">To</th>
+                            <th style="padding: 10px; text-align: left; color: var(--text-secondary);">Step</th>
+                            <th style="padding: 10px; text-align: center; color: var(--text-secondary);">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="add-data-rows">
+                        <tr><td colspan="6" style="padding: 15px; text-align: center; color: var(--text-secondary);">No rows added yet</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-bottom: 20px;">
+            <h2 style="margin-bottom: 15px;">📋 CSV Preview</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                <button onclick="downloadAddDataCSV()" style="padding: 12px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none;" id="download-csv-btn">📥 Download CSV</button>
+                <button onclick="copyAddDataCSV()" style="padding: 12px 20px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none;" id="copy-csv-btn">📋 Copy to Clipboard</button>
+                <button onclick="useInUnattended()" style="padding: 12px 20px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none;" id="use-csv-btn">🚀 Use in Unattended</button>
+            </div>
+            <pre id="add-data-csv-preview" style="background: var(--bg-secondary); padding: 15px; border-radius: 4px; max-height: 300px; overflow-y: auto; font-size: 0.75em; white-space: pre-wrap; word-wrap: break-word; display: none; border-left: 3px solid #0284c7;">test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step</pre>
         </div>
     </div>
 
@@ -3110,6 +3194,144 @@
             document.getElementById('unattended-results-panel').style.display = 'none';
             document.getElementById('unattended-upload-status').innerHTML = '';
             showStatus('unattended-upload-status', '', 'success');
+        }
+
+        // Add Unattended Data Functions
+        let addDataRows = [];
+
+        function addDataRow() {
+            const testId = document.getElementById('add-test-id').value.trim();
+            const pythonPath = document.getElementById('add-python-path').value.trim();
+            const ohlcPath = document.getElementById('add-ohlc-path').value.trim();
+            const additionalOhlc = document.getElementById('add-additional-ohlc').value.trim();
+            const paramName = document.getElementById('add-param-name').value.trim();
+            const paramFrom = document.getElementById('add-param-from').value.trim();
+            const paramTo = document.getElementById('add-param-to').value.trim();
+            const paramStep = document.getElementById('add-param-step').value.trim();
+
+            const statusDiv = document.getElementById('add-data-status');
+
+            // Validation
+            if (!testId || !pythonPath || !ohlcPath || !paramName || !paramFrom || !paramTo || !paramStep) {
+                statusDiv.textContent = '❌ Please fill all required fields';
+                statusDiv.style.background = '#fee2e2';
+                statusDiv.style.color = '#991b1b';
+                statusDiv.style.display = 'block';
+                return;
+            }
+
+            // Add row
+            addDataRows.push({
+                testId, pythonPath, ohlcPath, additionalOhlc, paramName,
+                paramFrom: parseFloat(paramFrom),
+                paramTo: parseFloat(paramTo),
+                paramStep: parseFloat(paramStep)
+            });
+
+            // Clear form
+            clearAddDataForm();
+
+            // Update display
+            updateAddDataDisplay();
+
+            statusDiv.textContent = '✅ Row added successfully';
+            statusDiv.style.background = '#d1fae5';
+            statusDiv.style.color = '#065f46';
+            statusDiv.style.display = 'block';
+            setTimeout(() => statusDiv.style.display = 'none', 3000);
+        }
+
+        function removeAddDataRow(index) {
+            addDataRows.splice(index, 1);
+            updateAddDataDisplay();
+        }
+
+        function updateAddDataDisplay() {
+            const tbody = document.getElementById('add-data-rows');
+            const csvPreview = document.getElementById('add-data-csv-preview');
+            const downloadBtn = document.getElementById('download-csv-btn');
+            const copyBtn = document.getElementById('copy-csv-btn');
+            const useBtn = document.getElementById('use-csv-btn');
+
+            if (addDataRows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="padding: 15px; text-align: center; color: var(--text-secondary);">No rows added yet</td></tr>';
+                csvPreview.style.display = 'none';
+                downloadBtn.style.display = 'none';
+                copyBtn.style.display = 'none';
+                useBtn.style.display = 'none';
+                return;
+            }
+
+            // Update table
+            tbody.innerHTML = addDataRows.map((row, idx) => `
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 10px;">${row.testId}</td>
+                    <td style="padding: 10px;">${row.paramName}</td>
+                    <td style="padding: 10px;">${row.paramFrom}</td>
+                    <td style="padding: 10px;">${row.paramTo}</td>
+                    <td style="padding: 10px;">${row.paramStep}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        <button onclick="removeAddDataRow(${idx})" style="padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.8em;">Remove</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Generate CSV
+            let csvContent = 'test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step\n';
+            addDataRows.forEach(row => {
+                csvContent += `${row.testId},${row.pythonPath},${row.ohlcPath},${row.additionalOhlc},${row.paramName},${row.paramFrom},${row.paramTo},${row.paramStep}\n`;
+            });
+
+            csvPreview.textContent = csvContent;
+            csvPreview.style.display = 'block';
+            downloadBtn.style.display = 'block';
+            copyBtn.style.display = 'block';
+            useBtn.style.display = 'block';
+        }
+
+        function clearAddDataForm() {
+            document.getElementById('add-test-id').value = '';
+            document.getElementById('add-python-path').value = '';
+            document.getElementById('add-ohlc-path').value = '';
+            document.getElementById('add-additional-ohlc').value = '';
+            document.getElementById('add-param-name').value = '';
+            document.getElementById('add-param-from').value = '';
+            document.getElementById('add-param-to').value = '';
+            document.getElementById('add-param-step').value = '';
+        }
+
+        function downloadAddDataCSV() {
+            const csvContent = document.getElementById('add-data-csv-preview').textContent;
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'unattended_template.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function copyAddDataCSV() {
+            const csvContent = document.getElementById('add-data-csv-preview').textContent;
+            navigator.clipboard.writeText(csvContent).then(() => {
+                const btn = document.getElementById('copy-csv-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => btn.textContent = originalText, 2000);
+            });
+        }
+
+        function useInUnattended() {
+            if (addDataRows.length === 0) return;
+            const csvContent = document.getElementById('add-data-csv-preview').textContent;
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const file = new File([blob], 'unattended_template.csv', { type: 'text/csv' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            document.getElementById('unattended-csv-file').files = dt.files;
+            switchPage('unattended');
         }
 
     </script>
