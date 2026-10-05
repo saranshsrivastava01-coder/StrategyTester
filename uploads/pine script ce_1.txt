@@ -1,0 +1,456 @@
+//@version=6
+// ============================= CHANGE LOG =============================
+// v1 - Converted the original Chandelier Exit indicator into a strategy.
+//      Core CE calculation left unchanged; added strategy.entry() orders
+//      on buySignal (long) and sellSignal (short). No added filters.
+// v2 - Added configurable EMA(9) / EMA(21) trend confirmation filter.
+//      A CE buy only triggers a trade when EMA9 > EMA21, a CE sell only
+//      triggers a trade when EMA9 < EMA21. Signals blocked by the EMA
+//      filter are marked with a gray X on the chart instead of traded.
+// v3 - Added this change log block to the top of the script.
+// v4 - Removed the separate gray X marker. Instead, the Buy/Sell label
+//      itself is colored gray when the CE signal is blocked by the EMA
+//      filter, and colored green/red as normal when it passes.
+// v5 - Added a configurable point-based Take Profit / Stop Loss exit,
+//      selectable via an "Exit Mode" input. 'Original (CE Reversal)'
+//      keeps the old behavior (always in market, exits only by flipping
+//      to the opposite signal). 'Points TP/SL' closes the trade once
+//      price moves the configured number of points in either direction.
+// v6 - Added an "EMA Freedom Candle" filter that runs on its own
+//      configurable timeframe (text box, default 15) with its own
+//      independent fast/slow EMAs (default 9/21), separate from the
+//      trend-filter EMAs and the CE logic. A CE Buy is only taken while
+//      the freedom bias is LONG, a CE Sell only while it is SHORT.
+//      Blocked signals are grayed out like the EMA filter. Strategy
+//      name/shorttitle now carry the version number.
+//      FREEDOM BIAS DEFINITION (on the freedom timeframe):
+//        1) Fast EMA crosses Slow EMA (starts a new cycle, resets bias).
+//        2) After the cross, find 3 consecutive candles that do NOT touch
+//           the fast EMA (wick-inclusive) and include at least one candle
+//           of the opposite color (red for longs, green for shorts).
+//           Freedom High = highest high of the 3, Freedom Low = lowest low.
+//        3) First candle CLOSE beyond that level sets the bias
+//           (above Freedom High = LONG, below Freedom Low = SHORT).
+//        4) Bias holds until the next opposite EMA cross resets it.
+// v7 - Freedom Check Timeframe can now be LOWER than the chart timeframe
+//      (as well as equal or higher). Lower timeframes use
+//      request.security_lower_tf(): the freedom state machine runs on
+//      every lower-timeframe bar and the chart bar reads the state at the
+//      end of its last intrabar. Equal timeframe runs directly, higher
+//      timeframe still reads the last CLOSED higher-timeframe bar
+//      (lookahead on + [1]) so it does not repaint. Removed the old
+//      "timeframe must be >= chart" error. Strategy name is now v7.
+//      NOTE: lower-timeframe (intrabar) history on TradingView is limited
+//      and depends on your plan, so the filter has less history to
+//      backtest on when a lower timeframe is used. Until intrabar data
+//      exists the bias stays 0 and the filter blocks trades.
+// v8 - Added same-side PYRAMIDING. If a trade is already open and another
+//      valid (green Buy / red Sell, i.e. all enabled filters pass) signal
+//      fires on the SAME side, the strategy now enters again instead of
+//      ignoring it. When a valid signal fires on the OPPOSITE side, all
+//      open same-side trades are closed at once (order reversal) and a
+//      new trade opens on the new side. Gray (blocked) signals still do
+//      nothing. New "Pyramiding" inputs: enable toggle and a max number
+//      of open entries (1-100). Also changed strategy settings:
+//      initial capital = 1,000,000 and fixed order quantity = 100 per
+//      entry. Strategy name is now v8.
+// v9 - Initial capital raised to 100,000,000 (100M). Added a new
+//      "Additional Stop-Loss Logic" group, layered on top of the existing
+//      Exit Mode (does not replace or change it; with its master toggle
+//      off, behavior is identical to v8). Five independently toggleable
+//      stop types, all under one master enable switch:
+//        1) Static ATR Stop      - entry price +/- (ATR x multiplier),
+//           fixed at the moment of entry, not recalculated afterward.
+//        2) Swing High/Low Stop  - lowest low (longs) / highest high
+//           (shorts) over a lookback window, measured strictly before
+//           the entry bar.
+//        3) Point-Based Stop     - fixed distance in points/ticks from
+//           entry, independent of the Exit Mode's own point-based stop.
+//        4) Breakeven Move       - once profit reaches a point threshold,
+//           the combined stop (from 1-3) ratchets to entry price. Never
+//           loosens an existing stop.
+//        5) Time-Based Stop      - if the oldest open trade on a side
+//           hasn't moved a minimum number of points within N bars, all
+//           trades on that side are closed at market.
+//        6) EMA Follow-Through Reversal Stop - candle-pattern based, own
+//           configurable slow EMA length: for shorts, one candle closes
+//           above the slow EMA, then the next candle closes above that
+//           candle's close -> close all shorts. Mirrored for longs
+//           (close below EMA, then next candle closes below that close).
+//      Stops 1-4 combine into one stop price per side (tightest of the
+//      enabled types wins) and are placed as a real stop order via
+//      strategy.exit(), alongside whatever the Exit Mode above is doing -
+//      whichever stop is hit first closes the trade. Stops 5-6 are
+//      event/pattern based and close the position with strategy.close()
+//      when their condition is met. Strategy name is now v9.
+// v10 - Changed the "Points TP/SL" Exit Mode to "Points SL Only (TP via
+//       Signal)". Removed the fixed take-profit entirely (the tpPoints
+//       input is gone). Profit exits now always come from the opposite
+//       valid signal reversing the trade, exactly as in "Original (CE
+//       Reversal)" mode; the only difference this mode adds is a fixed
+//       point-based stop-loss placed alongside that signal-based exit.
+//       Strategy name is now v10.
+// v11 - Redefined "points" across the whole script to mean literal price
+//       units of the instrument (1 point = $1.00 on XAUUSD, so 4200 ->
+//       4201 is 1 point), instead of ticks (previously 1 point = 1 tick =
+//       $0.01 on most gold feeds, making prior point values ~100x smaller
+//       in dollar terms than intended). Affects: Exit Mode's Stop Loss
+//       (points), Point-Based Stop distance, Breakeven Trigger, and Time
+//       Stop's Min Progress Required. The Exit Mode's stop-loss now uses
+//       an explicit stop price (avg entry price +/- points) instead of
+//       strategy.exit's tick-based loss parameter, so it lines up with
+//       the Additional Stop-Loss Logic's point handling. Also rescaled
+//       the default values for these inputs (previously 500 meant $5;
+//       kept at 500 now would mean $500, an unrealistic gold stop) down
+//       to more sensible dollar defaults - check them before using.
+//       Strategy name is now v11.
+// ========================================================================
+// Chandelier Exit strategy with EMA(9/21) trend confirmation filter,
+// EMA Freedom Candle filter (lower / same / higher timeframe), and
+// selectable exit mode (CE reversal vs fixed points TP/SL).
+// Core indicator logic (c) 2019-present, Alex Orekhov (everget), GPL-3.0.
+strategy('Chandelier Exit Strategy v11', shorttitle = 'JAS-CE Strategy v11', overlay = true, initial_capital = 100000000, default_qty_type = strategy.fixed, default_qty_value = 100, pyramiding = 100)
+
+const string calcGroup = 'Calculation'
+length = input.int(22, title = 'ATR Period', group = calcGroup)
+mult = input.float(3.0, step = 0.1, title = 'ATR Multiplier', group = calcGroup)
+useClose = input.bool(true, title = 'Use Close Price for Extremums', group = calcGroup)
+
+const string visualGroup = 'Visuals'
+showLabels = input.bool(true, title = 'Show Buy/Sell Labels', group = visualGroup)
+highlightState = input.bool(true, title = 'Highlight State', group = visualGroup)
+
+const string alertGroup = 'Alerts'
+awaitBarConfirmation = input.bool(true, title = 'Await Bar Confirmation', group = alertGroup)
+
+const string emaGroup = 'EMA Trend Filter'
+ema9Len = input.int(9, title = 'Fast EMA Length', group = emaGroup)
+ema21Len = input.int(21, title = 'Slow EMA Length', group = emaGroup)
+
+const string freedomGroup = 'EMA Freedom Candle Filter'
+useFreedomFilter = input.bool(true, title = 'Enable Freedom Candle Filter', group = freedomGroup)
+freedomTf = input.string('15', title = 'Freedom Check Timeframe', group = freedomGroup, tooltip = 'Type a timeframe: minutes as a number (1, 5, 15, 60, 240) or 1D, 1W. Can be lower than, equal to, or higher than the chart timeframe. Lower timeframes are limited by how much intrabar history TradingView provides.')
+freedomFastLen = input.int(9, title = 'Freedom Fast EMA Length', minval = 1, group = freedomGroup)
+freedomSlowLen = input.int(21, title = 'Freedom Slow EMA Length', minval = 1, group = freedomGroup)
+showFreedomLevels = input.bool(true, title = 'Plot Freedom High / Low Levels', group = freedomGroup)
+
+const string exitGroup = 'Exit Settings'
+exitMode = input.string('Original (CE Reversal)', title = 'Exit Mode', options = ['Original (CE Reversal)', 'Points SL Only (TP via Signal)'], group = exitGroup)
+slPoints = input.float(10.0, title = 'Stop Loss (points = price units, e.g. 10 = $10 on gold)', minval = 0.01, group = exitGroup)
+
+const string pyramidGroup = 'Pyramiding'
+enablePyramiding = input.bool(true, title = 'Enable Same-Side Pyramiding', group = pyramidGroup, tooltip = 'ON: a valid signal on the same side as the open trade(s) adds another entry. OFF: same-side signals are ignored while a trade is open (old behavior).')
+maxEntries = input.int(10, title = 'Max Open Entries (same side)', minval = 1, maxval = 100, group = pyramidGroup)
+
+const string slGroup = 'Additional Stop-Loss Logic'
+useExtraSl = input.bool(false, title = 'Enable Additional Stop-Loss Logic', group = slGroup, tooltip = 'Master switch. OFF: behaves exactly like v8 - only the Exit Mode above controls exits. ON: the enabled stop types below run alongside the Exit Mode; whichever exit is hit first closes the trade.')
+
+useAtrStop = input.bool(false, title = '1) Static ATR Stop', group = slGroup)
+atrStopLen = input.int(14, title = '   ATR Stop Length', group = slGroup)
+atrStopMult = input.float(2.0, title = '   ATR Stop Multiplier', group = slGroup)
+
+useSwingStop = input.bool(false, title = '2) Swing High/Low Stop', group = slGroup)
+swingLookback = input.int(10, title = '   Swing Lookback (bars before entry)', minval = 1, group = slGroup)
+
+usePointStop = input.bool(false, title = '3) Point-Based Stop', group = slGroup)
+slStopPoints = input.float(10.0, title = '   Stop Distance (points = price units)', minval = 0.01, group = slGroup)
+
+useBreakeven = input.bool(false, title = '4) Move Stop to Breakeven', group = slGroup)
+breakevenTriggerPoints = input.float(10.0, title = '   Breakeven Trigger (points = price units, profit)', minval = 0.01, group = slGroup)
+
+useTimeStop = input.bool(false, title = '5) Time-Based Stop', group = slGroup)
+timeStopBars = input.int(20, title = '   Max Bars Without Progress', minval = 1, group = slGroup)
+timeStopMinPoints = input.float(0.0, title = '   Min Progress Required (points = price units)', minval = 0.0, group = slGroup)
+
+useEmaFollowStop = input.bool(false, title = '6) EMA Follow-Through Reversal Stop', group = slGroup)
+slEmaLen = input.int(21, title = '   Follow-Through Slow EMA Length', minval = 1, group = slGroup)
+
+//---
+
+// ============================= FREEDOM CANDLE STATE MACHINE =============================
+// Returns [bias, freedomHigh, freedomLow]. bias: 1 = LONG, -1 = SHORT, 0 = none.
+// Must run on every bar of whichever timeframe it is evaluated on.
+freedomState(int fastLen, int slowLen) =>
+    fastE = ta.ema(close, fastLen)
+    slowE = ta.ema(close, slowLen)
+    bullCross = ta.crossover(fastE, slowE)
+    bearCross = ta.crossunder(fastE, slowE)
+
+    var bool seekLong = false
+    var bool waitLong = false
+    var float freedomHigh = na
+    var int longCrossBar = na
+
+    var bool seekShort = false
+    var bool waitShort = false
+    var float freedomLow = na
+    var int shortCrossBar = na
+
+    var int bias = 0
+
+    // wick-inclusive "touch": candle range overlaps the fast EMA on that same bar
+    clear0 = not (high >= fastE and low <= fastE)
+    clear1 = not (high[1] >= fastE[1] and low[1] <= fastE[1])
+    clear2 = not (high[2] >= fastE[2] and low[2] <= fastE[2])
+    allClear = clear0 and clear1 and clear2
+    hasRed = close < open or close[1] < open[1] or close[2] < open[2]
+    hasGreen = close > open or close[1] > open[1] or close[2] > open[2]
+
+    if bullCross
+        seekLong := true
+        waitLong := false
+        freedomHigh := na
+        longCrossBar := bar_index
+        seekShort := false
+        waitShort := false
+        freedomLow := na
+        bias := 0
+
+    if bearCross
+        seekShort := true
+        waitShort := false
+        freedomLow := na
+        shortCrossBar := bar_index
+        seekLong := false
+        waitLong := false
+        freedomHigh := na
+        bias := 0
+
+    // lock in the Freedom High (3 candles after the cross, all clear of the EMA, at least one red)
+    if seekLong and not waitLong and not na(longCrossBar) and bar_index - longCrossBar >= 3 and allClear and hasRed
+        freedomHigh := math.max(high, high[1], high[2])
+        waitLong := true
+        seekLong := false
+
+    // lock in the Freedom Low (3 candles after the cross, all clear of the EMA, at least one green)
+    if seekShort and not waitShort and not na(shortCrossBar) and bar_index - shortCrossBar >= 3 and allClear and hasGreen
+        freedomLow := math.min(low, low[1], low[2])
+        waitShort := true
+        seekShort := false
+
+    // breakout close confirms the bias
+    if waitLong and not na(freedomHigh) and close > freedomHigh
+        bias := 1
+        waitLong := false
+
+    if waitShort and not na(freedomLow) and close < freedomLow
+        bias := -1
+        waitShort := false
+
+    [bias, freedomHigh, freedomLow]
+
+// Same values shifted by one bar, used for higher timeframes so only closed bars are read (no repaint).
+freedomStatePrev(int fastLen, int slowLen) =>
+    [b, h, l] = freedomState(fastLen, slowLen)
+    [b[1], h[1], l[1]]
+
+// ---- Which timeframe case are we in? ----
+freedomSecs = timeframe.in_seconds(freedomTf)
+chartSecs = timeframe.in_seconds()
+isLower = freedomSecs < chartSecs
+isSame = freedomSecs == chartSecs
+isHigher = freedomSecs > chartSecs
+
+// ---- SAME timeframe: run directly on the chart ----
+[directBias, directHigh, directLow] = freedomState(freedomFastLen, freedomSlowLen)
+
+// ---- HIGHER timeframe: last closed higher-timeframe bar ----
+int htfBias = na
+float htfHigh = na
+float htfLow = na
+if isHigher
+    [hb, hh, hl] = request.security(syminfo.tickerid, freedomTf, freedomStatePrev(freedomFastLen, freedomSlowLen), lookahead = barmerge.lookahead_on)
+    htfBias := hb
+    htfHigh := hh
+    htfLow := hl
+
+// ---- LOWER timeframe: state machine runs on every intrabar, chart bar reads the last intrabar ----
+var int ltfBias = 0
+var float ltfHigh = na
+var float ltfLow = na
+if isLower
+    [bArr, hArr, lArr] = request.security_lower_tf(syminfo.tickerid, freedomTf, freedomState(freedomFastLen, freedomSlowLen))
+    if array.size(bArr) > 0
+        ltfBias := array.last(bArr)
+        ltfHigh := array.last(hArr)
+        ltfLow := array.last(lArr)
+
+freedomBias = nz(isLower ? ltfBias : isSame ? directBias : htfBias)
+freedomHighLevel = isLower ? ltfHigh : isSame ? directHigh : htfHigh
+freedomLowLevel = isLower ? ltfLow : isSame ? directLow : htfLow
+
+freedomLongOk = not useFreedomFilter or freedomBias == 1
+freedomShortOk = not useFreedomFilter or freedomBias == -1
+
+// ============================= EMA TREND FILTER =============================
+// Calculated early so it can color the Buy/Sell labels below
+ema9 = ta.ema(close, ema9Len)
+ema21 = ta.ema(close, ema21Len)
+emaBullish = ema9 > ema21
+emaBearish = ema9 < ema21
+
+// A CE signal is only "clear to trade" when every enabled filter agrees
+longOk = emaBullish and freedomLongOk
+shortOk = emaBearish and freedomShortOk
+
+// ============================= CHANDELIER EXIT CORE (unchanged logic) =============================
+atr = mult * ta.atr(length)
+
+longStop = (useClose ? ta.highest(close, length) : ta.highest(length)) - atr
+longStopPrev = nz(longStop[1], longStop)
+longStop := close[1] > longStopPrev ? math.max(longStop, longStopPrev) : longStop
+
+shortStop = (useClose ? ta.lowest(close, length) : ta.lowest(length)) + atr
+shortStopPrev = nz(shortStop[1], shortStop)
+shortStop := close[1] < shortStopPrev ? math.min(shortStop, shortStopPrev) : shortStop
+
+var int dir = 1
+dir := close > shortStopPrev ? 1 : close < longStopPrev ? -1 : dir
+
+const color textColor = color.white
+const color longColor = color.green
+const color shortColor = color.red
+const color blockedColor = color.gray
+const color longFillColor = color.new(color.green, 85)
+const color shortFillColor = color.new(color.red, 85)
+
+buySignal = dir == 1 and dir[1] == -1
+longStopPlot = plot(dir == 1 ? longStop : na, title = 'Long Stop', style = plot.style_linebr, linewidth = 2, color = longColor)
+plotshape(buySignal ? longStop : na, title = 'Long Stop Start', location = location.absolute, style = shape.circle, size = size.tiny, color = longOk ? longColor : blockedColor)
+plotshape(buySignal and showLabels ? longStop : na, title = 'Buy Label', text = 'Buy', location = location.absolute, style = shape.labelup, size = size.tiny, color = longOk ? longColor : blockedColor, textcolor = textColor)
+
+sellSignal = dir == -1 and dir[1] == 1
+shortStopPlot = plot(dir == 1 ? na : shortStop, title = 'Short Stop', style = plot.style_linebr, linewidth = 2, color = shortColor)
+plotshape(sellSignal ? shortStop : na, title = 'Short Stop Start', location = location.absolute, style = shape.circle, size = size.tiny, color = shortOk ? shortColor : blockedColor)
+plotshape(sellSignal and showLabels ? shortStop : na, title = 'Sell Label', text = 'Sell', location = location.absolute, style = shape.labeldown, size = size.tiny, color = shortOk ? shortColor : blockedColor, textcolor = textColor)
+
+midPricePlot = plot(ohlc4, title = '', display = display.none, editable = false)
+
+fill(midPricePlot, longStopPlot, title = 'Long State Filling', color = (highlightState and dir == 1 ? longFillColor : na))
+fill(midPricePlot, shortStopPlot, title = 'Short State Filling', color = (highlightState and dir == -1 ? shortFillColor : na))
+
+await = awaitBarConfirmation ? barstate.isconfirmed : true
+alertcondition(dir != dir[1] and await, title = 'CE Direction Change', message = 'Chandelier Exit has changed direction, {{exchange}}:{{ticker}}')
+alertcondition(buySignal and await, title = 'CE Buy', message = 'Chandelier Exit Buy, {{exchange}}:{{ticker}}')
+alertcondition(sellSignal and await, title = 'CE Sell', message = 'Chandelier Exit Sell, {{exchange}}:{{ticker}}')
+
+// ============================= EMA + FREEDOM PLOTS =============================
+plot(ema9, title = 'EMA 9', color = color.aqua, linewidth = 1)
+plot(ema21, title = 'EMA 21', color = color.orange, linewidth = 1)
+
+plot(showFreedomLevels and useFreedomFilter ? freedomHighLevel : na, title = 'Freedom High', color = color.new(color.lime, 30), style = plot.style_linebr, linewidth = 1)
+plot(showFreedomLevels and useFreedomFilter ? freedomLowLevel : na, title = 'Freedom Low', color = color.new(color.maroon, 30), style = plot.style_linebr, linewidth = 1)
+
+// ============================= STRATEGY ORDERS =============================
+finalBuy = buySignal and longOk
+finalSell = sellSignal and shortOk
+
+// Pyramiding logic:
+//  - Flat or opposite side open : a valid signal always enters. An opposite-side
+//    entry reverses the position, i.e. it closes ALL open same-side trades and
+//    opens a new trade on the new side.
+//  - Same side already open     : a valid signal adds another entry, only if
+//    pyramiding is enabled and fewer than maxEntries trades are open.
+//  Gray (blocked) signals never reach this point, so they do nothing.
+canAddLong = strategy.position_size <= 0 or (enablePyramiding and strategy.opentrades < maxEntries)
+canAddShort = strategy.position_size >= 0 or (enablePyramiding and strategy.opentrades < maxEntries)
+
+if finalBuy and canAddLong
+    strategy.entry('Long', strategy.long)
+
+if finalSell and canAddShort
+    strategy.entry('Short', strategy.short)
+
+// ============================= ADDITIONAL STOP-LOSS LOGIC (v9) =============================
+// Everything in this block only runs when useExtraSl is on. It sits alongside the
+// Exit Mode logic below (untouched from v8) rather than replacing it.
+
+// --- Sub-type 1: static ATR distance, fixed at the moment of entry ---
+atrStopVal = ta.atr(atrStopLen) * atrStopMult
+
+// --- Sub-type 2: swing high/low strictly before the entry bar (no lookahead) ---
+swingLowBeforeEntry = ta.lowest(low, swingLookback)[1]
+swingHighBeforeEntry = ta.highest(high, swingLookback)[1]
+
+// Combined stop level per side: the tightest (closest to price) of the enabled
+// sub-types 1-3 wins, since that is the one that would be hit first anyway.
+var float longStopLevel = na
+var float shortStopLevel = na
+
+if finalBuy and canAddLong
+    longCandidates = array.new_float(0)
+    if useAtrStop
+        array.push(longCandidates, close - atrStopVal)
+    if useSwingStop
+        array.push(longCandidates, swingLowBeforeEntry)
+    if usePointStop
+        array.push(longCandidates, close - slStopPoints)
+    longStopLevel := array.size(longCandidates) > 0 ? array.max(longCandidates) : na
+
+if finalSell and canAddShort
+    shortCandidates = array.new_float(0)
+    if useAtrStop
+        array.push(shortCandidates, close + atrStopVal)
+    if useSwingStop
+        array.push(shortCandidates, swingHighBeforeEntry)
+    if usePointStop
+        array.push(shortCandidates, close + slStopPoints)
+    shortStopLevel := array.size(shortCandidates) > 0 ? array.min(shortCandidates) : na
+
+// --- Sub-type 4: breakeven ratchet, applied every bar while a stop level exists ---
+if useBreakeven and strategy.position_size > 0 and not na(longStopLevel)
+    beTriggerLong = strategy.position_avg_price + breakevenTriggerPoints
+    if high >= beTriggerLong
+        longStopLevel := math.max(longStopLevel, strategy.position_avg_price)
+
+if useBreakeven and strategy.position_size < 0 and not na(shortStopLevel)
+    beTriggerShort = strategy.position_avg_price - breakevenTriggerPoints
+    if low <= beTriggerShort
+        shortStopLevel := math.min(shortStopLevel, strategy.position_avg_price)
+
+if strategy.position_size == 0
+    longStopLevel := na
+    shortStopLevel := na
+
+if useExtraSl and strategy.position_size > 0 and not na(longStopLevel)
+    strategy.exit('Long Extra SL', from_entry = 'Long', stop = longStopLevel)
+
+if useExtraSl and strategy.position_size < 0 and not na(shortStopLevel)
+    strategy.exit('Short Extra SL', from_entry = 'Short', stop = shortStopLevel)
+
+// --- Sub-type 5: time-based stop, tracked from the oldest open trade on that side ---
+if useExtraSl and useTimeStop and strategy.position_size > 0
+    entryBarLong = strategy.opentrades.entry_bar_index(0)
+    entryPxLong = strategy.opentrades.entry_price(0)
+    if (bar_index - entryBarLong >= timeStopBars) and (close - entryPxLong < timeStopMinPoints)
+        strategy.close('Long', comment = 'Time Stop')
+
+if useExtraSl and useTimeStop and strategy.position_size < 0
+    entryBarShort = strategy.opentrades.entry_bar_index(0)
+    entryPxShort = strategy.opentrades.entry_price(0)
+    if (bar_index - entryBarShort >= timeStopBars) and (entryPxShort - close < timeStopMinPoints)
+        strategy.close('Short', comment = 'Time Stop')
+
+// --- Sub-type 6: EMA follow-through reversal (candle-pattern based, own slow EMA) ---
+slEma = ta.ema(close, slEmaLen)
+shortFollowThrough = close[1] > slEma[1] and close > close[1]
+longFollowThrough = close[1] < slEma[1] and close < close[1]
+
+if useExtraSl and useEmaFollowStop and shortFollowThrough and strategy.position_size < 0
+    strategy.close('Short', comment = 'EMA Follow-Through SL')
+
+if useExtraSl and useEmaFollowStop and longFollowThrough and strategy.position_size > 0
+    strategy.close('Long', comment = 'EMA Follow-Through SL')
+
+// Points-based stop-loss only, no fixed take-profit. Points = price units here
+// (1 point = $1 on gold), so the stop price is entry price +/- slPoints directly.
+// When 'Original (CE Reversal)' is selected, no exit order is placed here and
+// the position only closes by flipping to the opposite signal, exactly as in
+// earlier versions. When 'Points SL Only (TP via Signal)' is selected, a fixed
+// stop-loss is placed, but profit exits still only happen via the opposite
+// signal reversing the trade.
+if exitMode == 'Points SL Only (TP via Signal)'
+    if strategy.position_size > 0
+        strategy.exit('Long Exit', from_entry = 'Long', stop = strategy.position_avg_price - slPoints)
+    if strategy.position_size < 0
+        strategy.exit('Short Exit', from_entry = 'Short', stop = strategy.position_avg_price + slPoints)

@@ -1,0 +1,13 @@
+test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step
+TEST_010,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,length,1,3,1
+TEST_010,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,mult,0.1,1,0.1
+TEST_010,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,ema9Len,1,5,1
+TEST_010,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,ema21Len,1,5,1
+TEST_011,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,length,1,3,1
+TEST_011,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,mult,0.1,1,0.1
+TEST_011,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,ema9Len,1,5,1
+TEST_011,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,ema21Len,5,10,1
+TEST_012,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,length,1,3,1
+TEST_012,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,mult,0.1,1,0.1
+TEST_012,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,ema9Len,1,5,1
+TEST_012,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,ema21Len,10,15,1
