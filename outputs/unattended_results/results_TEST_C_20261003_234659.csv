@@ -1,4 +1,0 @@
-Rank,Parameters,Total Trades,Winning Trades,Losing Trades,Win Rate (%),Max Profit,Max Loss,Total PnL,Max Drawdown,Profit Factor
-1,length=6.0,267,96,171,35.96,41899.00,-18169.50,120277.00,67850.50,1.2140
-2,length=10.0,289,107,182,37.02,31042.50,-39753.00,34471.50,86245.00,1.0555
-3,length=2.0,241,81,160,33.61,57325.00,-32423.00,-7272.50,134252.50,0.9884

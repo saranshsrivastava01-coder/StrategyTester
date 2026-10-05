@@ -1,0 +1,54 @@
+================================================================================
+UNATTENDED BRUTE FORCE EXECUTION STATISTICS
+================================================================================
+
+Test Sequence ID: TEST_010
+Execution Time: 2026-10-05T19:03:04.481990
+Completion Time: 2026-10-05T19:03:04.482002
+
+EXECUTION SUMMARY
+================================================================================
+Total Combinations Tested: 1250
+Results Found: 1250
+Duration: 22.28 seconds
+Throughput: 56.11 combinations/second
+
+TOP 5 RESULTS (Sorted by Total PnL)
+================================================================================
+
+Rank 1:
+  Parameters: length=4.0, mult=1.0, ema9Len=4.0, ema21Len=1.0
+  Total PnL: 402100.50
+  Total Trades: 7
+  Win Rate: 100.00%
+  Profit Factor: 0.0000
+
+Rank 2:
+  Parameters: length=1.0, mult=0.7, ema9Len=3.0, ema21Len=2.0
+  Total PnL: 326546.00
+  Total Trades: 159
+  Win Rate: 64.78%
+  Profit Factor: 1.9363
+
+Rank 3:
+  Parameters: length=3.0, mult=0.3, ema9Len=2.0, ema21Len=1.0
+  Total PnL: 235029.00
+  Total Trades: 68
+  Win Rate: 57.35%
+  Profit Factor: 2.2654
+
+Rank 4:
+  Parameters: length=5.0, mult=0.6, ema9Len=3.0, ema21Len=5.0
+  Total PnL: 230979.50
+  Total Trades: 1786
+  Win Rate: 31.47%
+  Profit Factor: 1.1752
+
+Rank 5:
+  Parameters: length=2.0, mult=1.0, ema9Len=4.0, ema21Len=3.0
+  Total PnL: 228477.50
+  Total Trades: 167
+  Win Rate: 59.28%
+  Profit Factor: 1.4854
+
+================================================================================

@@ -2948,6 +2948,14 @@
 
                             // Calculate percentage
                             testPercentage = Math.round((testCompleted / testCombinations) * 100);
+
+                            // If current test has reached 100%, mark it as completed
+                            // (This handles the last test which never transitions away)
+                            if (testPercentage >= 100) {
+                                completedTests[currentTest] = true;
+                                testCompleted = testCombinations;
+                                testPercentage = 100;
+                            }
                         }
                     }
 
