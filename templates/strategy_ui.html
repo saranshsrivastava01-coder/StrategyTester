@@ -3151,14 +3151,17 @@
                             <p>📈 <strong>Overall Progress:</strong> ${progData.total.toLocaleString()} / ${progData.total.toLocaleString()} (100%)</p>
                             <p>🔄 <strong>Tests:</strong> ${actualCompletedCount} / ${progData.total_tests} completed</p>
                         `;
+                        console.log('Setting completion message with count:', actualCompletedCount);
                         progressDiv.innerHTML = progressHTML;
+                        console.log('Completion message set. progressDiv HTML:', progressDiv.innerHTML);
 
-                        // Show results panel after a short delay
+                        // Show results panel after a longer delay to let user see completion message
                         setTimeout(() => {
+                            console.log('Hiding execution panel and showing results panel');
                             document.getElementById('unattended-execution-panel').style.display = 'none';
                             document.getElementById('unattended-results-panel').style.display = 'block';
                             document.getElementById('unattended-stop-btn').style.display = 'none';
-                        }, 500);
+                        }, 2000);
 
                         return;
                     }
