@@ -818,8 +818,10 @@
         <h1 style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">➕ Add Unattended Test Data</h1>
         <p style="color: var(--text-secondary); margin-bottom: 25px; font-size: 0.95em;">Build CSV templates for unattended brute force testing with an easy-to-use form</p>
 
-        <div class="panel" style="margin-bottom: 20px;">
-            <h2 style="margin-bottom: 15px;">📝 Add Test Row</h2>
+        <!-- Test Configuration Section -->
+        <div class="panel" style="margin-bottom: 20px; border-left: 4px solid #667eea;">
+            <h2 style="margin-bottom: 15px;">⚙️ Test Configuration (Set Once)</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Configure your test once, then add multiple parameters below</p>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                 <div>
@@ -850,18 +852,22 @@
                         <input type="file" id="add-additional-ohlc-upload" accept=".csv" style="display: none;">
                     </div>
                 </div>
+            </div>
+
+            <div id="add-test-config-status" style="padding: 12px 15px; display: none; border-radius: 4px; background: #d1fae5; color: #065f46; font-weight: 500; margin-bottom: 10px;"></div>
+        </div>
+
+        <!-- Add Parameters Section -->
+        <div class="panel" style="margin-bottom: 20px; border-left: 4px solid #10b981;">
+            <h2 style="margin-bottom: 15px;">📊 Add Parameters to Test</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Select or type a parameter name, then provide the range and step values</p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                 <div>
                     <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Parameter Name *</label>
-                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px;">
-                        <select id="add-param-name" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
-                            <option value="">Select a parameter or enter manually...</option>
-                        </select>
-                        <input type="text" id="add-param-name-manual" placeholder="Or type..." style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;" style="display: none;">
-                    </div>
-                </div>
-                <div>
-                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Or Type Manually</label>
-                    <input type="text" id="add-param-name-custom" placeholder="Enter custom parameter name" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                    <select id="add-param-name" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                        <option value="">Select or type below...</option>
+                    </select>
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">From *</label>
@@ -877,11 +883,18 @@
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                <button onclick="addDataRow()" style="padding: 12px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s;">➕ Add Row</button>
-                <button onclick="clearAddDataForm()" style="padding: 12px 20px; background: #94a3b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s;">🔄 Reset</button>
-                <div id="add-data-status" style="padding: 12px 20px; display: none; border-radius: 4px; background: #d1fae5; color: #065f46; font-weight: 500;"></div>
+            <div>
+                <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Or Type Custom Parameter Name</label>
+                <input type="text" id="add-param-name-custom" placeholder="Enter custom parameter name" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; margin-bottom: 15px;">
             </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                <button onclick="addDataRow()" style="padding: 12px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s;">➕ Add Parameter</button>
+                <button onclick="clearParametersOnly()" style="padding: 12px 20px; background: #94a3b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s;">🔄 Clear Fields</button>
+                <button onclick="clearAddDataForm()" style="padding: 12px 20px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.2s;">🗑️ Clear All</button>
+            </div>
+
+            <div id="add-data-status" style="padding: 12px 20px; display: none; border-radius: 4px; background: #d1fae5; color: #065f46; font-weight: 500; margin-top: 15px;"></div>
         </div>
 
         <div class="panel" style="margin-bottom: 20px;">
@@ -3355,6 +3368,7 @@
             const pythonPath = document.getElementById('add-python-path').value.trim();
             const ohlcPath = document.getElementById('add-ohlc-path').value.trim();
             const additionalOhlc = document.getElementById('add-additional-ohlc').value.trim();
+
             // Use custom input if available, otherwise use dropdown selection
             let paramName = document.getElementById('add-param-name-custom').value.trim();
             if (!paramName) {
@@ -3367,8 +3381,16 @@
             const statusDiv = document.getElementById('add-data-status');
 
             // Validation
-            if (!testId || !pythonPath || !ohlcPath || !paramName || !paramFrom || !paramTo || !paramStep) {
-                statusDiv.textContent = '❌ Please fill all required fields';
+            if (!testId || !pythonPath || !ohlcPath) {
+                statusDiv.textContent = '❌ Please fill test configuration first (Test ID, Python file, OHLC file)';
+                statusDiv.style.background = '#fee2e2';
+                statusDiv.style.color = '#991b1b';
+                statusDiv.style.display = 'block';
+                return;
+            }
+
+            if (!paramName || !paramFrom || !paramTo || !paramStep) {
+                statusDiv.textContent = '❌ Please fill parameter name, from, to, and step values';
                 statusDiv.style.background = '#fee2e2';
                 statusDiv.style.color = '#991b1b';
                 statusDiv.style.display = 'block';
@@ -3383,13 +3405,17 @@
                 paramStep: parseFloat(paramStep)
             });
 
-            // Clear form
-            clearAddDataForm();
+            // Clear only parameter fields, keep config
+            document.getElementById('add-param-name').value = '';
+            document.getElementById('add-param-name-custom').value = '';
+            document.getElementById('add-param-from').value = '';
+            document.getElementById('add-param-to').value = '';
+            document.getElementById('add-param-step').value = '';
 
             // Update display
             updateAddDataDisplay();
 
-            statusDiv.textContent = '✅ Row added successfully';
+            statusDiv.textContent = '✅ Parameter added successfully';
             statusDiv.style.background = '#d1fae5';
             statusDiv.style.color = '#065f46';
             statusDiv.style.display = 'block';
@@ -3445,10 +3471,22 @@
         }
 
         function clearAddDataForm() {
+            // Clear entire form including config
             document.getElementById('add-test-id').value = '';
             document.getElementById('add-python-path').value = '';
             document.getElementById('add-ohlc-path').value = '';
             document.getElementById('add-additional-ohlc').value = '';
+            document.getElementById('add-param-name').value = '';
+            document.getElementById('add-param-name-custom').value = '';
+            document.getElementById('add-param-from').value = '';
+            document.getElementById('add-param-to').value = '';
+            document.getElementById('add-param-step').value = '';
+            addDataRows = [];
+            updateAddDataDisplay();
+        }
+
+        function clearParametersOnly() {
+            // Clear only parameter fields, keep test config
             document.getElementById('add-param-name').value = '';
             document.getElementById('add-param-name-custom').value = '';
             document.getElementById('add-param-from').value = '';
