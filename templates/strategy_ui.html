@@ -3771,19 +3771,12 @@
             document.getElementById('unattended-csv-file').dispatchEvent(event);
 
             const statusDiv = document.getElementById('build-csv-status');
-            statusDiv.textContent = '✅ CSV loaded! Now click Validate';
+            statusDiv.textContent = '✅ CSV loaded! You can still download or copy it here. Click Validate to execute.';
             statusDiv.style.background = '#d1fae5';
             statusDiv.style.color = '#065f46';
             statusDiv.style.display = 'block';
 
-            // Reset build data
-            buildDataRows = [];
-            document.getElementById('build-test-id').value = '';
-            document.getElementById('build-python-path').value = '';
-            document.getElementById('build-ohlc-path').value = '';
-            document.getElementById('build-additional-ohlc').value = '';
-            updateBuildCSVPreview();
-
+            // Keep data in modal - don't reset so user can download/copy if needed
             // Scroll to upload section
             document.querySelector('input[id="unattended-csv-file"]').scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
