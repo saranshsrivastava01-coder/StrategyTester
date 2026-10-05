@@ -750,7 +750,13 @@
     <!-- Unattended Brute Force Page -->
     <div id="unattended-page" class="page-content" style="padding: 20px; max-width: 1600px; margin: 0 auto;">
         <h1 style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">🤖 Unattended Brute Force Strategy Tester</h1>
-        <p style="color: var(--text-secondary); margin-bottom: 25px; font-size: 0.95em;">Upload CSV file with test specifications to run multiple brute force tests automatically</p>
+        <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.95em;">Upload CSV file with test specifications to run multiple brute force tests automatically</p>
+
+        <!-- Build CSV Template Button -->
+        <div style="margin-bottom: 20px;">
+            <button onclick="openBuildCSVModal()" style="padding: 12px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.95em; transition: all 0.2s;">📝 Build CSV Template</button>
+            <span style="color: var(--text-secondary); margin-left: 12px; font-size: 0.9em;">Or create the CSV by filling a form instead of uploading</span>
+        </div>
 
         <div class="panel">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
@@ -788,46 +794,43 @@
             <div id="unattended-upload-status" class="status-message" style="margin-top: 10px;"></div>
         </div>
 
-        <!-- Build CSV Template Section -->
-        <div class="panel" style="margin-top: 20px; border-left: 4px solid #10b981;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-                <h2 style="margin: 0;">📝 Or Build CSV Template Here</h2>
-                <button onclick="toggleBuildCSVSection()" style="padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.9em;">▼ Show</button>
-            </div>
-
-            <div id="build-csv-section" style="display: none;">
-                <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Create your test CSV directly here instead of uploading a file</p>
+        <!-- Build CSV Modal -->
+        <div id="build-csv-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; padding: 20px; display: flex; align-items: flex-start; justify-content: center;">
+            <div style="background: var(--panel-bg); border-radius: 8px; width: 100%; max-width: 900px; margin-top: 40px; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0; font-size: 1.4em;">📝 Build CSV Template</h2>
+                    <button onclick="closeBuildCSVModal()" style="padding: 8px 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1.2em; line-height: 1;">✕</button>
+                </div>
 
                 <!-- Test Configuration -->
-                <div style="background: var(--bg-secondary); padding: 15px; border-radius: 4px; margin-bottom: 15px; border-left: 3px solid #667eea;">
-                    <h3 style="margin-top: 0; margin-bottom: 12px; color: var(--text-primary);">⚙️ Test Configuration (Set Once)</h3>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 4px; border-left: 3px solid #667eea;">
+                    <h3 style="margin-top: 0; margin-bottom: 12px;">⚙️ Test Configuration</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                         <div>
-                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Test Sequence ID *</label>
-                            <input type="text" id="build-test-id" placeholder="e.g., TEST_001" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.9em;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9em;">Test Sequence ID *</label>
+                            <input type="text" id="build-test-id" placeholder="e.g., TEST_001" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Python Strategy File *</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9em;">Python Strategy File *</label>
                             <div style="display: grid; grid-template-columns: 1fr auto; gap: 6px;">
-                                <input type="text" id="build-python-path" placeholder="/path/to/strategy.py" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.9em;">
-                                <button onclick="document.getElementById('build-python-upload').click()" style="padding: 8px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap; font-size: 0.85em;">📤</button>
+                                <input type="text" id="build-python-path" placeholder="/path/to/strategy.py" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                                <button onclick="document.getElementById('build-python-upload').click()" style="padding: 8px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📤</button>
                                 <input type="file" id="build-python-upload" accept=".py" style="display: none;">
                             </div>
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Main OHLC File *</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9em;">Main OHLC File *</label>
                             <div style="display: grid; grid-template-columns: 1fr auto; gap: 6px;">
-                                <input type="text" id="build-ohlc-path" placeholder="/path/to/ohlc.csv" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.9em;">
-                                <button onclick="document.getElementById('build-ohlc-upload').click()" style="padding: 8px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap; font-size: 0.85em;">📤</button>
+                                <input type="text" id="build-ohlc-path" placeholder="/path/to/ohlc.csv" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                                <button onclick="document.getElementById('build-ohlc-upload').click()" style="padding: 8px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📤</button>
                                 <input type="file" id="build-ohlc-upload" accept=".csv" style="display: none;">
                             </div>
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Additional OHLC File (Optional)</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9em;">Additional OHLC (Optional)</label>
                             <div style="display: grid; grid-template-columns: 1fr auto; gap: 6px;">
-                                <input type="text" id="build-additional-ohlc" placeholder="/path/to/additional.csv" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.9em;">
-                                <button onclick="document.getElementById('build-additional-ohlc-upload').click()" style="padding: 8px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap; font-size: 0.85em;">📤</button>
+                                <input type="text" id="build-additional-ohlc" placeholder="/path/to/additional.csv" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                                <button onclick="document.getElementById('build-additional-ohlc-upload').click()" style="padding: 8px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📤</button>
                                 <input type="file" id="build-additional-ohlc-upload" accept=".csv" style="display: none;">
                             </div>
                         </div>
@@ -835,47 +838,46 @@
                 </div>
 
                 <!-- Add Parameters -->
-                <div style="background: var(--bg-secondary); padding: 15px; border-radius: 4px; margin-bottom: 15px; border-left: 3px solid #10b981;">
-                    <h3 style="margin-top: 0; margin-bottom: 12px; color: var(--text-primary);">📊 Add Parameters</h3>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 4px; border-left: 3px solid #10b981;">
+                    <h3 style="margin-top: 0; margin-bottom: 12px;">📊 Add Parameters</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
                         <div>
-                            <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Parameter</label>
-                            <select id="build-param-name" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500; font-size: 0.85em;">Parameter</label>
+                            <select id="build-param-name" style="padding: 6px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
                                 <option value="">Select...</option>
                             </select>
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">From</label>
-                            <input type="number" id="build-param-from" placeholder="1" step="0.1" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500; font-size: 0.85em;">From</label>
+                            <input type="number" id="build-param-from" placeholder="1" step="0.1" style="padding: 6px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">To</label>
-                            <input type="number" id="build-param-to" placeholder="100" step="0.1" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500; font-size: 0.85em;">To</label>
+                            <input type="number" id="build-param-to" placeholder="100" step="0.1" style="padding: 6px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
                         </div>
                         <div>
-                            <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Step</label>
-                            <input type="number" id="build-param-step" placeholder="1" step="0.1" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500; font-size: 0.85em;">Step</label>
+                            <input type="number" id="build-param-step" placeholder="1" step="0.1" style="padding: 6px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
                         </div>
                     </div>
 
-                    <div style="margin-bottom: 12px;">
-                        <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Or Type Custom Parameter</label>
-                        <input type="text" id="build-param-custom" placeholder="Enter custom parameter name" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Or Type Custom Parameter</label>
+                        <input type="text" id="build-param-custom" placeholder="Enter custom parameter name" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <button onclick="addBuildDataRow()" style="padding: 10px 16px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">➕ Add Parameter</button>
-                        <button onclick="loadBuildDataToUnattended()" style="padding: 10px 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">↓ Load to CSV</button>
+                        <button onclick="addBuildDataRow()" style="padding: 10px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">➕ Add Parameter</button>
+                        <button onclick="loadBuildDataToUnattended()" style="padding: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">↓ Load to CSV</button>
                     </div>
 
-                    <div id="build-csv-status" style="padding: 10px 12px; display: none; border-radius: 4px; background: #d1fae5; color: #065f46; font-weight: 500; margin-top: 10px; font-size: 0.85em;"></div>
+                    <div id="build-csv-status" style="padding: 8px 10px; display: none; border-radius: 4px; background: #d1fae5; color: #065f46; font-weight: 500; margin-top: 10px; font-size: 0.85em;"></div>
                 </div>
 
                 <!-- Preview -->
-                <div style="background: var(--bg-secondary); padding: 12px; border-radius: 4px;">
-                    <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--text-primary); font-size: 0.9em;">📋 Preview</h4>
-                    <pre id="build-csv-preview" style="margin: 0; font-size: 0.7em; white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto; background: white; padding: 8px; border-radius: 3px; color: #333;">test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step</pre>
+                <div>
+                    <h4 style="margin-top: 0; margin-bottom: 10px;">📋 Preview</h4>
+                    <pre id="build-csv-preview" style="margin: 0; font-size: 0.7em; white-space: pre-wrap; word-wrap: break-word; max-height: 150px; overflow-y: auto; background: white; padding: 8px; border-radius: 3px; color: #333;">test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step</pre>
                 </div>
             </div>
         </div>
@@ -3654,17 +3656,21 @@
         // Build CSV Functions
         let buildDataRows = [];
 
-        function toggleBuildCSVSection() {
-            const section = document.getElementById('build-csv-section');
-            const btn = event.target;
-            if (section.style.display === 'none') {
-                section.style.display = 'block';
-                btn.textContent = '▲ Hide';
-            } else {
-                section.style.display = 'none';
-                btn.textContent = '▼ Show';
-            }
+        function openBuildCSVModal() {
+            document.getElementById('build-csv-modal').style.display = 'flex';
         }
+
+        function closeBuildCSVModal() {
+            document.getElementById('build-csv-modal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('build-csv-modal');
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
 
         function addBuildDataRow() {
             const testId = document.getElementById('build-test-id').value.trim();
