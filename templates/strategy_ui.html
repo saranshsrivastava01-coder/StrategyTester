@@ -867,18 +867,26 @@
                         <input type="text" id="build-param-custom" placeholder="Enter custom parameter name" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
                         <button onclick="addBuildDataRow()" style="padding: 10px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">➕ Add Parameter</button>
+                        <button onclick="clearBuildParameters()" style="padding: 10px; background: #94a3b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 Clear Params</button>
                         <button onclick="loadBuildDataToUnattended()" style="padding: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">↓ Load to CSV</button>
                     </div>
 
                     <div id="build-csv-status" style="padding: 8px 10px; display: none; border-radius: 4px; background: #d1fae5; color: #065f46; font-weight: 500; margin-top: 10px; font-size: 0.85em;"></div>
                 </div>
 
-                <!-- Preview -->
-                <div>
+                <!-- Preview & Actions -->
+                <div style="margin-bottom: 15px;">
                     <h4 style="margin-top: 0; margin-bottom: 10px;">📋 Preview</h4>
                     <pre id="build-csv-preview" style="margin: 0; font-size: 0.7em; white-space: pre-wrap; word-wrap: break-word; max-height: 150px; overflow-y: auto; background: white; padding: 8px; border-radius: 3px; color: #333;">test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step</pre>
+                </div>
+
+                <!-- Download & Clear All Buttons -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <button onclick="downloadBuildCSV()" style="padding: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📥 Download CSV</button>
+                    <button onclick="copyBuildCSV()" style="padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📋 Copy CSV</button>
+                    <button onclick="clearBuildAll()" style="padding: 10px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🗑️ Clear All</button>
                 </div>
             </div>
         </div>
@@ -3778,6 +3786,104 @@
 
             // Scroll to upload section
             document.querySelector('input[id="unattended-csv-file"]').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function clearBuildParameters() {
+            document.getElementById('build-param-name').value = '';
+            document.getElementById('build-param-custom').value = '';
+            document.getElementById('build-param-from').value = '';
+            document.getElementById('build-param-to').value = '';
+            document.getElementById('build-param-step').value = '';
+        }
+
+        function clearBuildAll() {
+            document.getElementById('build-test-id').value = '';
+            document.getElementById('build-python-path').value = '';
+            document.getElementById('build-ohlc-path').value = '';
+            document.getElementById('build-additional-ohlc').value = '';
+            clearBuildParameters();
+            buildDataRows = [];
+            updateBuildCSVPreview();
+            document.getElementById('build-csv-status').style.display = 'none';
+        }
+
+        async function downloadBuildCSV() {
+            if (buildDataRows.length === 0) {
+                alert('❌ Add at least one parameter first');
+                return;
+            }
+
+            const csvContent = document.getElementById('build-csv-preview').textContent;
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+            // Try using File System Access API (modern browsers)
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: 'unattended_template.csv',
+                        types: [
+                            {
+                                description: 'CSV Files',
+                                accept: { 'text/csv': ['.csv'] }
+                            }
+                        ]
+                    });
+
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+
+                    const statusDiv = document.getElementById('build-csv-status');
+                    statusDiv.textContent = '✅ CSV saved successfully';
+                    statusDiv.style.background = '#d1fae5';
+                    statusDiv.style.color = '#065f46';
+                    statusDiv.style.display = 'block';
+                    setTimeout(() => statusDiv.style.display = 'none', 3000);
+                    return;
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.log('File System Access API not available, falling back');
+                    }
+                }
+            }
+
+            // Fallback: Standard download
+            const filename = prompt('Enter filename (without .csv extension):', 'unattended_template');
+            if (filename === null) return;
+
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', (filename || 'unattended_template') + '.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            const statusDiv = document.getElementById('build-csv-status');
+            statusDiv.textContent = '✅ CSV downloaded successfully';
+            statusDiv.style.background = '#d1fae5';
+            statusDiv.style.color = '#065f46';
+            statusDiv.style.display = 'block';
+            setTimeout(() => statusDiv.style.display = 'none', 3000);
+        }
+
+        function copyBuildCSV() {
+            if (buildDataRows.length === 0) {
+                alert('❌ Add at least one parameter first');
+                return;
+            }
+
+            const csvContent = document.getElementById('build-csv-preview').textContent;
+            navigator.clipboard.writeText(csvContent).then(() => {
+                const statusDiv = document.getElementById('build-csv-status');
+                statusDiv.textContent = '✅ CSV copied to clipboard';
+                statusDiv.style.background = '#d1fae5';
+                statusDiv.style.color = '#065f46';
+                statusDiv.style.display = 'block';
+                setTimeout(() => statusDiv.style.display = 'none', 3000);
+            });
         }
 
         // File upload handlers for build CSV section
