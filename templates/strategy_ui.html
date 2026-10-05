@@ -375,7 +375,6 @@
             <button class="nav-tab" onclick="switchPage('tester')">🧪 Strategy Tester</button>
             <button class="nav-tab" onclick="switchPage('bruteforce')">⚡ Brute Force</button>
             <button class="nav-tab" onclick="switchPage('unattended')">🤖 Unattended Brute Force</button>
-            <button class="nav-tab" onclick="switchPage('add-data')">➕ Add Data</button>
         </div>
     </div>
 
@@ -789,6 +788,98 @@
             <div id="unattended-upload-status" class="status-message" style="margin-top: 10px;"></div>
         </div>
 
+        <!-- Build CSV Template Section -->
+        <div class="panel" style="margin-top: 20px; border-left: 4px solid #10b981;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                <h2 style="margin: 0;">📝 Or Build CSV Template Here</h2>
+                <button onclick="toggleBuildCSVSection()" style="padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.9em;">▼ Show</button>
+            </div>
+
+            <div id="build-csv-section" style="display: none;">
+                <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">Create your test CSV directly here instead of uploading a file</p>
+
+                <!-- Test Configuration -->
+                <div style="background: var(--bg-secondary); padding: 15px; border-radius: 4px; margin-bottom: 15px; border-left: 3px solid #667eea;">
+                    <h3 style="margin-top: 0; margin-bottom: 12px; color: var(--text-primary);">⚙️ Test Configuration (Set Once)</h3>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Test Sequence ID *</label>
+                            <input type="text" id="build-test-id" placeholder="e.g., TEST_001" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.9em;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Python Strategy File *</label>
+                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 6px;">
+                                <input type="text" id="build-python-path" placeholder="/path/to/strategy.py" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.9em;">
+                                <button onclick="document.getElementById('build-python-upload').click()" style="padding: 8px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap; font-size: 0.85em;">📤</button>
+                                <input type="file" id="build-python-upload" accept=".py" style="display: none;">
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Main OHLC File *</label>
+                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 6px;">
+                                <input type="text" id="build-ohlc-path" placeholder="/path/to/ohlc.csv" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.9em;">
+                                <button onclick="document.getElementById('build-ohlc-upload').click()" style="padding: 8px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap; font-size: 0.85em;">📤</button>
+                                <input type="file" id="build-ohlc-upload" accept=".csv" style="display: none;">
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Additional OHLC File (Optional)</label>
+                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 6px;">
+                                <input type="text" id="build-additional-ohlc" placeholder="/path/to/additional.csv" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.9em;">
+                                <button onclick="document.getElementById('build-additional-ohlc-upload').click()" style="padding: 8px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap; font-size: 0.85em;">📤</button>
+                                <input type="file" id="build-additional-ohlc-upload" accept=".csv" style="display: none;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Parameters -->
+                <div style="background: var(--bg-secondary); padding: 15px; border-radius: 4px; margin-bottom: 15px; border-left: 3px solid #10b981;">
+                    <h3 style="margin-top: 0; margin-bottom: 12px; color: var(--text-primary);">📊 Add Parameters</h3>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Parameter</label>
+                            <select id="build-param-name" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                                <option value="">Select...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">From</label>
+                            <input type="number" id="build-param-from" placeholder="1" step="0.1" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">To</label>
+                            <input type="number" id="build-param-to" placeholder="100" step="0.1" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Step</label>
+                            <input type="number" id="build-param-step" placeholder="1" step="0.1" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: block; margin-bottom: 4px; color: var(--text-secondary); font-weight: 500; font-size: 0.85em;">Or Type Custom Parameter</label>
+                        <input type="text" id="build-param-custom" placeholder="Enter custom parameter name" style="padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%; font-size: 0.85em;">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button onclick="addBuildDataRow()" style="padding: 10px 16px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">➕ Add Parameter</button>
+                        <button onclick="loadBuildDataToUnattended()" style="padding: 10px 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">↓ Load to CSV</button>
+                    </div>
+
+                    <div id="build-csv-status" style="padding: 10px 12px; display: none; border-radius: 4px; background: #d1fae5; color: #065f46; font-weight: 500; margin-top: 10px; font-size: 0.85em;"></div>
+                </div>
+
+                <!-- Preview -->
+                <div style="background: var(--bg-secondary); padding: 12px; border-radius: 4px;">
+                    <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--text-primary); font-size: 0.9em;">📋 Preview</h4>
+                    <pre id="build-csv-preview" style="margin: 0; font-size: 0.7em; white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto; background: white; padding: 8px; border-radius: 3px; color: #333;">test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step</pre>
+                </div>
+            </div>
+        </div>
+
         <div class="panel" id="unattended-tests-panel" style="display: none; margin-top: 20px;">
             <h2>📋 Test Sequences</h2>
             <div id="unattended-tests-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
@@ -920,10 +1011,9 @@
 
         <div class="panel" style="margin-bottom: 20px;">
             <h2 style="margin-bottom: 15px;">📋 CSV Preview</h2>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
                 <button onclick="downloadAddDataCSV()" style="padding: 12px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none;" id="download-csv-btn">📥 Download CSV</button>
                 <button onclick="copyAddDataCSV()" style="padding: 12px 20px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none;" id="copy-csv-btn">📋 Copy to Clipboard</button>
-                <button onclick="useInUnattended()" style="padding: 12px 20px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none;" id="use-csv-btn">🚀 Use in Unattended</button>
             </div>
             <pre id="add-data-csv-preview" style="background: var(--bg-secondary); padding: 15px; border-radius: 4px; max-height: 300px; overflow-y: auto; font-size: 0.75em; white-space: pre-wrap; word-wrap: break-word; display: none; border-left: 3px solid #0284c7;">test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step</pre>
         </div>
@@ -3561,15 +3651,212 @@
             });
         }
 
-        function useInUnattended() {
-            if (addDataRows.length === 0) return;
-            const csvContent = document.getElementById('add-data-csv-preview').textContent;
+        // Build CSV Functions
+        let buildDataRows = [];
+
+        function toggleBuildCSVSection() {
+            const section = document.getElementById('build-csv-section');
+            const btn = event.target;
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                btn.textContent = '▲ Hide';
+            } else {
+                section.style.display = 'none';
+                btn.textContent = '▼ Show';
+            }
+        }
+
+        function addBuildDataRow() {
+            const testId = document.getElementById('build-test-id').value.trim();
+            const pythonPath = document.getElementById('build-python-path').value.trim();
+            const ohlcPath = document.getElementById('build-ohlc-path').value.trim();
+            const additionalOhlc = document.getElementById('build-additional-ohlc').value.trim();
+
+            let paramName = document.getElementById('build-param-custom').value.trim();
+            if (!paramName) {
+                paramName = document.getElementById('build-param-name').value.trim();
+            }
+            const paramFrom = document.getElementById('build-param-from').value.trim();
+            const paramTo = document.getElementById('build-param-to').value.trim();
+            const paramStep = document.getElementById('build-param-step').value.trim();
+
+            const statusDiv = document.getElementById('build-csv-status');
+
+            // Validation
+            if (!testId || !pythonPath || !ohlcPath) {
+                statusDiv.textContent = '❌ Fill test configuration first';
+                statusDiv.style.background = '#fee2e2';
+                statusDiv.style.color = '#991b1b';
+                statusDiv.style.display = 'block';
+                return;
+            }
+
+            if (!paramName || !paramFrom || !paramTo || !paramStep) {
+                statusDiv.textContent = '❌ Fill all parameter fields';
+                statusDiv.style.background = '#fee2e2';
+                statusDiv.style.color = '#991b1b';
+                statusDiv.style.display = 'block';
+                return;
+            }
+
+            buildDataRows.push({
+                testId, pythonPath, ohlcPath, additionalOhlc, paramName,
+                paramFrom: parseFloat(paramFrom),
+                paramTo: parseFloat(paramTo),
+                paramStep: parseFloat(paramStep)
+            });
+
+            // Clear parameter fields
+            document.getElementById('build-param-name').value = '';
+            document.getElementById('build-param-custom').value = '';
+            document.getElementById('build-param-from').value = '';
+            document.getElementById('build-param-to').value = '';
+            document.getElementById('build-param-step').value = '';
+
+            updateBuildCSVPreview();
+
+            statusDiv.textContent = '✅ Parameter added';
+            statusDiv.style.background = '#d1fae5';
+            statusDiv.style.color = '#065f46';
+            statusDiv.style.display = 'block';
+            setTimeout(() => statusDiv.style.display = 'none', 2000);
+        }
+
+        function updateBuildCSVPreview() {
+            const csvPreview = document.getElementById('build-csv-preview');
+
+            if (buildDataRows.length === 0) {
+                csvPreview.textContent = 'test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step';
+                return;
+            }
+
+            let csvContent = 'test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step\n';
+            buildDataRows.forEach(row => {
+                csvContent += `${row.testId},${row.pythonPath},${row.ohlcPath},${row.additionalOhlc},${row.paramName},${row.paramFrom},${row.paramTo},${row.paramStep}\n`;
+            });
+
+            csvPreview.textContent = csvContent;
+        }
+
+        function loadBuildDataToUnattended() {
+            if (buildDataRows.length === 0) {
+                alert('❌ Add at least one parameter first');
+                return;
+            }
+
+            const csvContent = document.getElementById('build-csv-preview').textContent;
             const blob = new Blob([csvContent], { type: 'text/csv' });
             const file = new File([blob], 'unattended_template.csv', { type: 'text/csv' });
             const dt = new DataTransfer();
             dt.items.add(file);
             document.getElementById('unattended-csv-file').files = dt.files;
-            switchPage('unattended');
+
+            // Trigger file change event to load CSV
+            const event = new Event('change', { bubbles: true });
+            document.getElementById('unattended-csv-file').dispatchEvent(event);
+
+            const statusDiv = document.getElementById('build-csv-status');
+            statusDiv.textContent = '✅ CSV loaded! Now click Validate';
+            statusDiv.style.background = '#d1fae5';
+            statusDiv.style.color = '#065f46';
+            statusDiv.style.display = 'block';
+
+            // Reset build data
+            buildDataRows = [];
+            document.getElementById('build-test-id').value = '';
+            document.getElementById('build-python-path').value = '';
+            document.getElementById('build-ohlc-path').value = '';
+            document.getElementById('build-additional-ohlc').value = '';
+            updateBuildCSVPreview();
+
+            // Scroll to upload section
+            document.querySelector('input[id="unattended-csv-file"]').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // File upload handlers for build CSV section
+        document.addEventListener('DOMContentLoaded', function() {
+            const buildPythonUpload = document.getElementById('build-python-upload');
+            if (buildPythonUpload) {
+                buildPythonUpload.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        uploadBuildPythonFile(e.target.files[0]);
+                    }
+                });
+            }
+
+            const buildOhlcUpload = document.getElementById('build-ohlc-upload');
+            if (buildOhlcUpload) {
+                buildOhlcUpload.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        uploadBuildOhlcFile(e.target.files[0], 'main');
+                    }
+                });
+            }
+
+            const buildAdditionalOhlcUpload = document.getElementById('build-additional-ohlc-upload');
+            if (buildAdditionalOhlcUpload) {
+                buildAdditionalOhlcUpload.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        uploadBuildOhlcFile(e.target.files[0], 'additional');
+                    }
+                });
+            }
+        });
+
+        function uploadBuildPythonFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/upload-python-file', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('build-python-path').value = data.absolute_path;
+
+                    if (data.parameters && Object.keys(data.parameters).length > 0) {
+                        const paramSelect = document.getElementById('build-param-name');
+                        paramSelect.innerHTML = '<option value="">Select a parameter...</option>';
+                        Object.keys(data.parameters).forEach(paramName => {
+                            const option = document.createElement('option');
+                            option.value = paramName;
+                            option.textContent = paramName;
+                            paramSelect.appendChild(option);
+                        });
+                    }
+                }
+                document.getElementById('build-python-upload').value = '';
+            })
+            .catch(err => {
+                console.error('Upload error:', err);
+                document.getElementById('build-python-upload').value = '';
+            });
+        }
+
+        function uploadBuildOhlcFile(file, type) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/upload-ohlc-file', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const fieldId = type === 'main' ? 'build-ohlc-path' : 'build-additional-ohlc';
+                    const uploadId = type === 'main' ? 'build-ohlc-upload' : 'build-additional-ohlc-upload';
+                    document.getElementById(fieldId).value = data.absolute_path;
+                    document.getElementById(uploadId).value = '';
+                }
+            })
+            .catch(err => {
+                console.error('Upload error:', err);
+                const uploadId = type === 'main' ? 'build-ohlc-upload' : 'build-additional-ohlc-upload';
+                document.getElementById(uploadId).value = '';
+            });
         }
 
     </script>
