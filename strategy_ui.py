@@ -182,25 +182,46 @@ def _extract_parameters_from_python(python_code: str) -> dict:
     """Extract parameters from Python strategy code"""
     parameters = {}
 
-    for line in python_code.split('\n'):
+    lines = python_code.split('\n')
+
+    # Look for DEFAULT_PARAMS dictionary
+    in_default_params = False
+    for i, line in enumerate(lines):
+        if 'DEFAULT_PARAMS' in line and '=' in line and '{' in line:
+            in_default_params = True
+            # Handle inline DEFAULT_PARAMS = {...}
+            if '}' in line:
+                in_default_params = False
+        elif in_default_params:
+            if '}' in line:
+                in_default_params = False
+                continue
+
+            # Parse parameter lines like: 'param_name': value,
+            if "'" in line and ':' in line:
+                try:
+                    # Extract parameter name
+                    parts = line.split("'")
+                    if len(parts) >= 2:
+                        param_name = parts[1]
+                        # Add to parameters (just the names for now)
+                        parameters[param_name] = {
+                            'type': 'unknown',
+                            'default': None,
+                            'min': None,
+                            'max': None,
+                            'label': param_name
+                        }
+                except:
+                    pass
+
+        # Also check for self.params.setdefault pattern (legacy support)
         if 'self.params.setdefault' in line:
             try:
                 param_name = line.split("'")[1]
-                value_str = line.split(',')[1].strip().rstrip(')')
-
-                if value_str.lower() in ['true', 'false']:
-                    param_type = 'bool'
-                    default_value = value_str.lower() == 'true'
-                elif '.' in value_str:
-                    param_type = 'float'
-                    default_value = float(value_str)
-                else:
-                    param_type = 'int'
-                    default_value = int(value_str)
-
                 parameters[param_name] = {
-                    'type': param_type,
-                    'default': default_value,
+                    'type': 'unknown',
+                    'default': None,
                     'min': None,
                     'max': None,
                     'label': param_name
