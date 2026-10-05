@@ -288,6 +288,38 @@ def upload_excel():
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
+@app.route('/api/upload-python-file', methods=['POST'])
+def upload_python_file():
+    """Upload Python strategy file and return absolute path"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+
+        file = request.files['file']
+
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+        if not file.filename.endswith('.py'):
+            return jsonify({'success': False, 'error': 'Only .py files allowed'}), 400
+
+        # Save to uploads folder
+        filepath = UPLOAD_DIR / file.filename
+        file.save(str(filepath))
+
+        # Return absolute path
+        absolute_path = str(filepath.resolve())
+
+        return jsonify({
+            'success': True,
+            'filename': file.filename,
+            'absolute_path': absolute_path,
+            'message': f'File uploaded successfully: {file.filename}'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/reconcile-kpis', methods=['POST'])
 def reconcile_kpis():
     """Calculate and reconcile all 4 KPIs from Excel Trades tab"""
