@@ -3101,29 +3101,50 @@
                         const finalData = await finalResp.json();
 
                         // Mark all tests as completed with their final results
-                        for (const test of validatedTests) {
-                            const testResults = finalData.execution_results?.[test.test_sequence_id];
-                            const resultData = testResults ? {
-                                results_count: testResults.results_count,
-                                duration: testResults.duration,
-                                results_file: testResults.results_file,
-                                stats_file: testResults.stats_file
-                            } : null;
+                        console.log('Completion detected. validatedTests:', validatedTests, 'length:', validatedTests?.length);
 
-                            updateTestTile(test.test_sequence_id, 'completed', resultData, {
-                                completed: test.combinations,
-                                test_total: test.combinations,
-                                percentage: 100,
-                                rate: '0.00'
+                        if (validatedTests && validatedTests.length > 0) {
+                            for (const test of validatedTests) {
+                                const testResults = finalData.execution_results?.[test.test_sequence_id];
+                                const resultData = testResults ? {
+                                    results_count: testResults.results_count,
+                                    duration: testResults.duration,
+                                    results_file: testResults.results_file,
+                                    stats_file: testResults.stats_file
+                                } : null;
+
+                                updateTestTile(test.test_sequence_id, 'completed', resultData, {
+                                    completed: test.combinations,
+                                    test_total: test.combinations,
+                                    percentage: 100,
+                                    rate: '0.00'
+                                });
+
+                                // Ensure test is in completedTests dictionary
+                                completedTests[test.test_sequence_id] = true;
+                            }
+                        } else {
+                            // Fallback: if validatedTests is empty, use the actual test tiles on the page
+                            const testTiles = document.querySelectorAll('[id^="test-tile-"]');
+                            console.log('Fallback: found', testTiles.length, 'test tiles on page');
+                            testTiles.forEach(tile => {
+                                const testId = tile.id.replace('test-tile-', '');
+                                completedTests[testId] = true;
                             });
-
-                            // Ensure test is in completedTests dictionary
-                            completedTests[test.test_sequence_id] = true;
                         }
 
                         const elapsed = Math.round((Date.now() - startTime) / 1000);
-                        // Use actual completed count from dictionary
-                        const actualCompletedCount = Object.keys(completedTests).length;
+                        // Use actual completed count - fallback to counting test tiles on page
+                        let actualCompletedCount = Object.keys(completedTests).length;
+
+                        // If count is still 0, count the test tiles that exist on the page
+                        if (actualCompletedCount === 0) {
+                            const testTiles = document.querySelectorAll('[id^="test-tile-"]');
+                            actualCompletedCount = testTiles.length;
+                            console.log('Count was 0, fallback to tile count:', actualCompletedCount);
+                        }
+
+                        console.log('Final completedTests count:', actualCompletedCount, 'from:', Object.keys(completedTests));
                         const progressHTML = `
                             <p>✅ <strong>Execution Complete!</strong></p>
                             <p>⏱️ <strong>Total Time:</strong> ${elapsed}s</p>
