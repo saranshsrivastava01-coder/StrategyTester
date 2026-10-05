@@ -2928,20 +2928,27 @@
                     let previousCombinations = 0;
 
                     if (currentTest && testCombinations > 0) {
-                        // Get combinations completed in previous tests
-                        for (const test of validatedTests) {
-                            if (test.test_sequence_id === currentTest) break;
-                            previousCombinations += test.combinations;
+                        // Check if this test is already marked as completed
+                        if (completedTests[currentTest]) {
+                            // Show 100% for completed tests
+                            testCompleted = testCombinations;
+                            testPercentage = 100;
+                        } else {
+                            // Get combinations completed in previous tests
+                            for (const test of validatedTests) {
+                                if (test.test_sequence_id === currentTest) break;
+                                previousCombinations += test.combinations;
+                            }
+
+                            // Current test progress = total completed - previous tests
+                            testCompleted = progData.completed - previousCombinations;
+
+                            // Ensure testCompleted doesn't exceed testCombinations
+                            testCompleted = Math.min(testCompleted, testCombinations);
+
+                            // Calculate percentage
+                            testPercentage = Math.round((testCompleted / testCombinations) * 100);
                         }
-
-                        // Current test progress = total completed - previous tests
-                        testCompleted = progData.completed - previousCombinations;
-
-                        // Ensure testCompleted doesn't exceed testCombinations
-                        testCompleted = Math.min(testCompleted, testCombinations);
-
-                        // Calculate percentage
-                        testPercentage = Math.round((testCompleted / testCombinations) * 100);
                     }
 
                     // Update tile if current test changed
