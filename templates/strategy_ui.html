@@ -3494,17 +3494,61 @@
             document.getElementById('add-param-step').value = '';
         }
 
-        function downloadAddDataCSV() {
+        async function downloadAddDataCSV() {
             const csvContent = document.getElementById('add-data-csv-preview').textContent;
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+            // Try using File System Access API (modern browsers)
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: 'unattended_template.csv',
+                        types: [
+                            {
+                                description: 'CSV Files',
+                                accept: { 'text/csv': ['.csv'] }
+                            }
+                        ]
+                    });
+
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+
+                    const statusDiv = document.getElementById('add-data-status');
+                    statusDiv.textContent = '✅ CSV saved successfully';
+                    statusDiv.style.background = '#d1fae5';
+                    statusDiv.style.color = '#065f46';
+                    statusDiv.style.display = 'block';
+                    setTimeout(() => statusDiv.style.display = 'none', 3000);
+                    return;
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.log('File System Access API not available, falling back to standard download');
+                    }
+                }
+            }
+
+            // Fallback: Standard download with filename suggestion
+            const filename = prompt('Enter filename (without .csv extension):', 'unattended_template');
+            if (filename === null) return; // User cancelled
+
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', 'unattended_template.csv');
+            link.setAttribute('download', (filename || 'unattended_template') + '.csv');
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            const statusDiv = document.getElementById('add-data-status');
+            statusDiv.textContent = '✅ CSV downloaded successfully';
+            statusDiv.style.background = '#d1fae5';
+            statusDiv.style.color = '#065f46';
+            statusDiv.style.display = 'block';
+            setTimeout(() => statusDiv.style.display = 'none', 3000);
         }
 
         function copyAddDataCSV() {
