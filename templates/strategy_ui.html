@@ -2979,13 +2979,17 @@
                     const testRemaining = testCombinations - testCompleted;
                     const testEta = rate > 0 ? Math.round(testRemaining / rate) : 0;
 
+                    // Calculate actual tests completed based on completed tiles
+                    const actualTestsCompleted = Object.keys(completedTests).length;
+                    const displayTestsCompleted = Math.max(progData.tests_completed, actualTestsCompleted);
+
                     const progressHTML = `
                         <p>⏱️ <strong>Elapsed:</strong> ${elapsed}s</p>
                         <p>📁 <strong>Current Test:</strong> ${currentTest || 'Initializing...'}</p>
                         <p>📊 <strong>Test Progress:</strong> ${testCompleted.toLocaleString()} / ${testCombinations.toLocaleString()} (${testPercentage}%)</p>
                         <p>🕐 <strong>Test ETA:</strong> ~${testEta}s (${Math.round(testEta / 60)} min)</p>
                         <p>📈 <strong>Overall Progress:</strong> ${progData.completed.toLocaleString()} / ${progData.total.toLocaleString()} (${progData.percentage}%)</p>
-                        <p>🔄 <strong>Tests:</strong> ${progData.tests_completed} / ${progData.total_tests} completed</p>
+                        <p>🔄 <strong>Tests:</strong> ${displayTestsCompleted} / ${progData.total_tests} completed</p>
                         <p>⚡ <strong>Rate:</strong> ${progData.rate} combinations/sec</p>
                         <p>🕐 <strong>Overall ETA:</strong> ~${progData.eta_seconds}s (${Math.round(progData.eta_seconds / 60)} min)</p>
                     `;
