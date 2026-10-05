@@ -852,9 +852,17 @@
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Parameter Name *</label>
-                    <input type="text" id="add-param-name" placeholder="e.g., length, mult" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px;">
+                        <select id="add-param-name" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                            <option value="">Select a parameter or enter manually...</option>
+                        </select>
+                        <input type="text" id="add-param-name-manual" placeholder="Or type..." style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;" style="display: none;">
+                    </div>
                 </div>
-                <div></div>
+                <div>
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Or Type Manually</label>
+                    <input type="text" id="add-param-name-custom" placeholder="Enter custom parameter name" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                </div>
                 <div>
                     <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">From *</label>
                     <input type="number" id="add-param-from" placeholder="1" step="0.1" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
@@ -3253,12 +3261,33 @@
             .then(data => {
                 if (data.success) {
                     document.getElementById('add-python-path').value = data.absolute_path;
+
+                    // Populate parameter dropdown if parameters were extracted
+                    if (data.parameters && Object.keys(data.parameters).length > 0) {
+                        const paramSelect = document.getElementById('add-param-name');
+                        paramSelect.innerHTML = '<option value="">Select a parameter...</option>';
+
+                        Object.keys(data.parameters).forEach(paramName => {
+                            const option = document.createElement('option');
+                            option.value = paramName;
+                            option.textContent = paramName;
+                            paramSelect.appendChild(option);
+                        });
+
+                        // Add event listener to populate when selected
+                        paramSelect.addEventListener('change', function() {
+                            if (this.value) {
+                                document.getElementById('add-param-name-custom').value = this.value;
+                            }
+                        });
+                    }
+
                     const statusDiv = document.getElementById('add-data-status');
-                    statusDiv.textContent = '✅ Python file uploaded: ' + file.name;
+                    statusDiv.textContent = '✅ Python file uploaded: ' + file.name + (data.parameters ? ' (' + Object.keys(data.parameters).length + ' parameters found)' : '');
                     statusDiv.style.background = '#d1fae5';
                     statusDiv.style.color = '#065f46';
                     statusDiv.style.display = 'block';
-                    setTimeout(() => statusDiv.style.display = 'none', 3000);
+                    setTimeout(() => statusDiv.style.display = 'none', 4000);
                 } else {
                     const statusDiv = document.getElementById('add-data-status');
                     statusDiv.textContent = '❌ ' + (data.error || 'Upload failed');
@@ -3326,7 +3355,11 @@
             const pythonPath = document.getElementById('add-python-path').value.trim();
             const ohlcPath = document.getElementById('add-ohlc-path').value.trim();
             const additionalOhlc = document.getElementById('add-additional-ohlc').value.trim();
-            const paramName = document.getElementById('add-param-name').value.trim();
+            // Use custom input if available, otherwise use dropdown selection
+            let paramName = document.getElementById('add-param-name-custom').value.trim();
+            if (!paramName) {
+                paramName = document.getElementById('add-param-name').value.trim();
+            }
             const paramFrom = document.getElementById('add-param-from').value.trim();
             const paramTo = document.getElementById('add-param-to').value.trim();
             const paramStep = document.getElementById('add-param-step').value.trim();
@@ -3417,6 +3450,7 @@
             document.getElementById('add-ohlc-path').value = '';
             document.getElementById('add-additional-ohlc').value = '';
             document.getElementById('add-param-name').value = '';
+            document.getElementById('add-param-name-custom').value = '';
             document.getElementById('add-param-from').value = '';
             document.getElementById('add-param-to').value = '';
             document.getElementById('add-param-step').value = '';

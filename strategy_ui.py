@@ -290,7 +290,7 @@ def upload_excel():
 
 @app.route('/api/upload-python-file', methods=['POST'])
 def upload_python_file():
-    """Upload Python strategy file and return absolute path"""
+    """Upload Python strategy file and return absolute path with extracted parameters"""
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'error': 'No file provided'}), 400
@@ -303,17 +303,25 @@ def upload_python_file():
         if not file.filename.endswith('.py'):
             return jsonify({'success': False, 'error': 'Only .py files allowed'}), 400
 
+        # Read file content to extract parameters
+        content = file.read().decode('utf-8')
+
         # Save to uploads folder
         filepath = UPLOAD_DIR / file.filename
-        file.save(str(filepath))
+        with open(str(filepath), 'w') as f:
+            f.write(content)
 
-        # Return absolute path
+        # Extract parameters from Python code
+        parameters = _extract_parameters_from_python(content)
+
+        # Return absolute path and parameters
         absolute_path = str(filepath.resolve())
 
         return jsonify({
             'success': True,
             'filename': file.filename,
             'absolute_path': absolute_path,
+            'parameters': parameters,
             'message': f'File uploaded successfully: {file.filename}'
         })
     except Exception as e:
