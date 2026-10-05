@@ -836,11 +836,19 @@
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Main OHLC File *</label>
-                    <input type="text" id="add-ohlc-path" placeholder="/path/to/ohlc.csv" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px;">
+                        <input type="text" id="add-ohlc-path" placeholder="/path/to/ohlc.csv" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                        <button onclick="document.getElementById('add-ohlc-upload').click()" style="padding: 10px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap;">📤 Upload</button>
+                        <input type="file" id="add-ohlc-upload" accept=".csv" style="display: none;">
+                    </div>
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Additional OHLC File (Optional)</label>
-                    <input type="text" id="add-additional-ohlc" placeholder="/path/to/additional.csv" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px;">
+                        <input type="text" id="add-additional-ohlc" placeholder="/path/to/additional.csv" style="padding: 10px; border: 1px solid var(--input-border); border-radius: 4px; background: var(--panel-bg); color: var(--text-primary); width: 100%;">
+                        <button onclick="document.getElementById('add-additional-ohlc-upload').click()" style="padding: 10px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap;">📤 Upload</button>
+                        <input type="file" id="add-additional-ohlc-upload" accept=".csv" style="display: none;">
+                    </div>
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-weight: 500; font-size: 0.9em;">Parameter Name *</label>
@@ -3203,13 +3211,31 @@
         // Add Unattended Data Functions
         let addDataRows = [];
 
-        // Python file upload handler
+        // File upload handlers
         document.addEventListener('DOMContentLoaded', function() {
             const pythonUpload = document.getElementById('add-python-upload');
             if (pythonUpload) {
                 pythonUpload.addEventListener('change', function(e) {
                     if (e.target.files.length > 0) {
                         uploadPythonFile(e.target.files[0]);
+                    }
+                });
+            }
+
+            const ohlcUpload = document.getElementById('add-ohlc-upload');
+            if (ohlcUpload) {
+                ohlcUpload.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        uploadOhlcFile(e.target.files[0], 'main');
+                    }
+                });
+            }
+
+            const additionalOhlcUpload = document.getElementById('add-additional-ohlc-upload');
+            if (additionalOhlcUpload) {
+                additionalOhlcUpload.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        uploadOhlcFile(e.target.files[0], 'additional');
                     }
                 });
             }
@@ -3250,6 +3276,48 @@
                 statusDiv.style.color = '#991b1b';
                 statusDiv.style.display = 'block';
                 document.getElementById('add-python-upload').value = '';
+            });
+        }
+
+        function uploadOhlcFile(file, type) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/upload-ohlc-file', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const fieldId = type === 'main' ? 'add-ohlc-path' : 'add-additional-ohlc';
+                    const uploadId = type === 'main' ? 'add-ohlc-upload' : 'add-additional-ohlc-upload';
+                    document.getElementById(fieldId).value = data.absolute_path;
+                    const statusDiv = document.getElementById('add-data-status');
+                    statusDiv.textContent = '✅ OHLC file uploaded: ' + file.name;
+                    statusDiv.style.background = '#d1fae5';
+                    statusDiv.style.color = '#065f46';
+                    statusDiv.style.display = 'block';
+                    setTimeout(() => statusDiv.style.display = 'none', 3000);
+                    document.getElementById(uploadId).value = '';
+                } else {
+                    const statusDiv = document.getElementById('add-data-status');
+                    statusDiv.textContent = '❌ ' + (data.error || 'Upload failed');
+                    statusDiv.style.background = '#fee2e2';
+                    statusDiv.style.color = '#991b1b';
+                    statusDiv.style.display = 'block';
+                    const uploadId = type === 'main' ? 'add-ohlc-upload' : 'add-additional-ohlc-upload';
+                    document.getElementById(uploadId).value = '';
+                }
+            })
+            .catch(err => {
+                const statusDiv = document.getElementById('add-data-status');
+                statusDiv.textContent = '❌ Upload error: ' + err.message;
+                statusDiv.style.background = '#fee2e2';
+                statusDiv.style.color = '#991b1b';
+                statusDiv.style.display = 'block';
+                const uploadId = type === 'main' ? 'add-ohlc-upload' : 'add-additional-ohlc-upload';
+                document.getElementById(uploadId).value = '';
             });
         }
 
