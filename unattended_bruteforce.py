@@ -57,22 +57,37 @@ class UnattendedBruteForceEngine:
                     continue
 
                 # Validate numeric fields
-                try:
-                    param_from = float(row['param_from'])
-                    param_to = float(row['param_to'])
-                    param_step = float(row['param_step'])
+                param_name = row['parameter_name'].strip()
 
-                    if param_step <= 0:
-                        errors.append(f"Row {idx}: param_step must be positive")
+                # Check if this is a boolean/non-numeric parameter
+                non_numeric_params = ['enablePyramiding', 'useClose', 'useSwingStop', 'useTimeStop', 'useAtrStop',
+                                     'useBreakeven', 'useEmaFollowStop', 'useExtraSl', 'useFreedomFilter',
+                                     'usePointStop', 'enablePyramiding', 'awaitBarConfirmation', 'highlightState', 'showLabels', 'showFreedomLevels']
+
+                if param_name not in non_numeric_params:
+                    try:
+                        param_from = float(row['param_from'])
+                        param_to = float(row['param_to'])
+                        param_step = float(row['param_step'])
+
+                        if param_step <= 0:
+                            errors.append(f"Row {idx}: param_step must be positive")
+                            continue
+
+                        if param_from >= param_to:
+                            errors.append(f"Row {idx}: param_from must be less than param_to")
+                            continue
+
+                    except ValueError as e:
+                        errors.append(f"Row {idx}: Invalid numeric value - {str(e)}")
                         continue
-
-                    if param_from >= param_to:
-                        errors.append(f"Row {idx}: param_from must be less than param_to")
-                        continue
-
-                except ValueError as e:
-                    errors.append(f"Row {idx}: Invalid numeric value - {str(e)}")
-                    continue
+                else:
+                    # For non-numeric parameters, just validate that from != to
+                    param_from = row['param_from'].strip()
+                    param_to = row['param_to'].strip()
+                    if param_from == param_to:
+                        # For boolean params with same from/to, that's OK (constant value)
+                        pass
 
                 # Validate file paths
                 python_path = row['python_file_path'].strip()
@@ -122,6 +137,11 @@ class UnattendedBruteForceEngine:
 
         param_lists = {}
 
+        # Non-numeric parameters (boolean/string)
+        non_numeric_params = ['enablePyramiding', 'useClose', 'useSwingStop', 'useTimeStop', 'useAtrStop',
+                             'useBreakeven', 'useEmaFollowStop', 'useExtraSl', 'useFreedomFilter',
+                             'usePointStop', 'awaitBarConfirmation', 'highlightState', 'showLabels', 'showFreedomLevels']
+
         for spec in specs:
             param_name = spec['parameter_name']
             from_val = spec['param_from']
@@ -129,12 +149,18 @@ class UnattendedBruteForceEngine:
             step = spec['param_step']
 
             values = []
-            # Use epsilon for floating point tolerance (same as brute force page)
-            current = float(from_val)
-            while current <= float(to_val) + 1e-9:
-                # Round to 10 decimals to avoid precision issues
-                values.append(round(current, 10))
-                current += float(step)
+
+            if param_name in non_numeric_params:
+                # For non-numeric parameters, just use the single value
+                # (from_val and to_val should be the same for constant parameters)
+                values = [from_val.strip()]
+            else:
+                # Use epsilon for floating point tolerance (same as brute force page)
+                current = float(from_val)
+                while current <= float(to_val) + 1e-9:
+                    # Round to 10 decimals to avoid precision issues
+                    values.append(round(current, 10))
+                    current += float(step)
 
             param_lists[param_name] = values
 
