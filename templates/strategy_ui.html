@@ -3368,7 +3368,7 @@
             if (pythonUpload) {
                 pythonUpload.addEventListener('change', function(e) {
                     if (e.target.files.length > 0) {
-                        uploadPythonFile(e.target.files[0]);
+                        uploadBuildPythonFile(e.target.files[0]);
                     }
                 });
             }
@@ -3392,7 +3392,7 @@
             }
         });
 
-        function uploadPythonFile(file) {
+        function uploadBuildPythonFile(file) {
             const formData = new FormData();
             formData.append('file', file);
 
