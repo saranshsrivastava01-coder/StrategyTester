@@ -630,6 +630,27 @@
                 return;
             }
 
+            // Check for duplicates
+            try {
+                const statsResponse = await fetch('/api/analysis/stats');
+                const statsData = await statsResponse.json();
+                const loadedFiles = statsData.files || [];
+
+                const duplicates = [];
+                for (let file of fileInput.files) {
+                    if (loadedFiles.includes(file.name)) {
+                        duplicates.push(file.name);
+                    }
+                }
+
+                if (duplicates.length > 0) {
+                    showMessage(`⚠️ Already loaded: ${duplicates.join(', ')}. Remove them first or select different files.`, 'error');
+                    return;
+                }
+            } catch (error) {
+                console.error('Error checking duplicates:', error);
+            }
+
             const formData = new FormData();
             for (let file of fileInput.files) {
                 formData.append('files', file);
@@ -666,7 +687,11 @@
                     return;
                 }
 
-                showMessage(`✅ Loaded ${data.files_loaded} file(s) with ${data.new_rows} combinations`, 'success');
+                let message = `✅ Loaded ${data.files_loaded} file(s) with ${data.new_rows} combinations`;
+                if (data.message) {
+                    message = data.message;
+                }
+                showMessage(message, 'success');
                 clearFileSelection();
 
                 // Refresh stats and results

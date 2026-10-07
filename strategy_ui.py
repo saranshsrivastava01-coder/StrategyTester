@@ -2471,9 +2471,15 @@ def upload_results():
         files = request.files.getlist('files')
         loaded_files = []
         new_rows = 0
+        duplicates = []
 
         for file in files:
             if not file.filename.endswith('.csv'):
+                continue
+
+            # Check for duplicates
+            if file.filename in analysis_cache['files_loaded']:
+                duplicates.append(file.filename)
                 continue
 
             # Read CSV
@@ -2505,12 +2511,18 @@ def upload_results():
         analysis_cache['files_loaded'].extend(loaded_files)
         analysis_cache['total_combinations'] = len(analysis_cache['aggregated_results'])
 
-        return jsonify({
+        response = {
             'success': True,
             'files_loaded': len(loaded_files),
             'new_rows': new_rows,
             'total_combinations': analysis_cache['total_combinations']
-        })
+        }
+
+        if duplicates:
+            response['duplicates'] = duplicates
+            response['message'] = f'Skipped {len(duplicates)} duplicate file(s): {", ".join(duplicates)}'
+
+        return jsonify(response)
 
     except Exception as e:
         return jsonify({'error': f'Error uploading results: {str(e)}'}), 500
