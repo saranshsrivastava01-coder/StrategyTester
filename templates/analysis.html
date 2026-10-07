@@ -635,10 +635,6 @@
         }
 
         async function removeFile(filename) {
-            if (!confirm(`Remove "${filename}" from analysis?`)) {
-                return;
-            }
-
             try {
                 const response = await fetch(`/api/analysis/remove-file/${encodeURIComponent(filename)}`, {
                     method: 'POST'
