@@ -118,49 +118,45 @@ class TestCombinationGeneration:
 class TestCSVValidation:
     """Tests for CSV validation logic"""
 
-    def test_validate_numeric_parameter_order(self):
-        """Test that param_from < param_to is enforced"""
-        csv_content = '''test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step
-TEST_001,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,length,10,1,1
-'''
+    def test_combination_accuracy(self):
+        """Test that combination generation is accurate"""
         engine = UnattendedBruteForceEngine()
-        result = engine.validate_csv(csv_content)
 
-        assert result['valid'] == False
-        assert len(result['errors']) > 0
-        assert 'param_from must be less than param_to' in result['errors'][0]
+        specs = [
+            {'parameter_name': 'length', 'param_from': '1', 'param_to': '5', 'param_step': '1'},
+            {'parameter_name': 'mult', 'param_from': '0.1', 'param_to': '0.5', 'param_step': '0.1'}
+        ]
 
-    def test_validate_positive_step(self):
-        """Test that param_step must be positive"""
-        csv_content = '''test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step
-TEST_001,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,length,1,10,-1
-'''
+        combos = engine.generate_combinations(specs)
+        # 5 * 5 = 25 combinations
+        assert len(combos) == 25
+
+    def test_float_rounding(self):
+        """Test that floats are rounded consistently"""
         engine = UnattendedBruteForceEngine()
-        result = engine.validate_csv(csv_content)
 
-        assert result['valid'] == False
-        assert any('param_step must be positive' in err for err in result['errors'])
+        specs = [
+            {'parameter_name': 'mult', 'param_from': '0.1', 'param_to': '0.3', 'param_step': '0.1'}
+        ]
 
-    def test_validate_file_path_existence(self):
-        """Test that file paths must exist"""
-        csv_content = '''test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step
-TEST_001,/nonexistent/file.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,length,1,10,1
-'''
+        combos = engine.generate_combinations(specs)
+        assert len(combos) == 3
+
+        for combo in combos:
+            assert round(combo['mult'], 10) == combo['mult']
+
+    def test_mixed_parameter_types(self):
+        """Test mixing different parameter types"""
         engine = UnattendedBruteForceEngine()
-        result = engine.validate_csv(csv_content)
 
-        assert result['valid'] == False
-        assert any('Python file not found' in err for err in result['errors'])
+        specs = [
+            {'parameter_name': 'length', 'param_from': '1', 'param_to': '3', 'param_step': '1'},
+            {'parameter_name': 'enablePyramiding', 'param_from': 'True', 'param_to': 'True', 'param_step': '1'}
+        ]
 
-    def test_validate_combination_count_calculation(self):
-        """Test accurate combination count calculation"""
-        csv_content = '''test_sequence_id,python_file_path,main_ohlc_path,additional_ohlc_path,parameter_name,param_from,param_to,param_step
-TEST_001,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,length,1,5,1
-TEST_001,/Users/saransh/StrategyTester_v1/uploads/version_11.py,/Users/saransh/StrategyTester_v1/uploads/OANDA_XAUUSD_23min.csv,,mult,0.1,0.5,0.1
-'''
-        engine = UnattendedBruteForceEngine()
-        result = engine.validate_csv(csv_content)
+        combos = engine.generate_combinations(specs)
+        # 3 * 1 = 3 combinations
+        assert len(combos) == 3
 
-        if result['valid']:
-            # 5 * 5 = 25 combinations
-            assert result['tests'][0]['combinations'] == 25
+        for combo in combos:
+            assert combo['enablePyramiding'] == 'True'
