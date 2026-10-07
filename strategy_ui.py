@@ -55,6 +55,13 @@ unattended_progress = {
     'execution_thread_id': None
 }
 
+# Global data for aggregated results analysis
+analysis_cache = {
+    'aggregated_results': [],
+    'files_loaded': [],
+    'total_combinations': 0
+}
+
 # Helper function to clean NaN values from dictionaries
 def clean_nan(obj):
     """Recursively replace NaN with None in dictionaries"""
@@ -2444,6 +2451,155 @@ def get_unattended_results(test_sequence_id):
 
     except Exception as e:
         return jsonify({'error': f'Error retrieving results: {str(e)}'}), 500
+
+
+# ==================== ANALYSIS ENDPOINTS ====================
+
+@app.route('/analysis')
+def analysis():
+    """Serve analysis page"""
+    return render_template('analysis.html')
+
+
+@app.route('/api/analysis/upload-results', methods=['POST'])
+def upload_results():
+    """Upload and aggregate result CSV files"""
+    try:
+        if 'files' not in request.files:
+            return jsonify({'error': 'No files provided'}), 400
+
+        files = request.files.getlist('files')
+        loaded_files = []
+        new_rows = 0
+
+        for file in files:
+            if not file.filename.endswith('.csv'):
+                continue
+
+            # Read CSV
+            df = pd.read_csv(file.stream)
+
+            # Required columns
+            required_cols = ['Parameters', 'Win Rate (%)', 'Total PnL', 'Max Drawdown', 'Profit Factor']
+            if not all(col in df.columns for col in required_cols):
+                continue
+
+            # Parse and add to cache
+            for _, row in df.iterrows():
+                result = {
+                    'file': file.filename,
+                    'parameters': row['Parameters'],
+                    'win_rate': float(row['Win Rate (%)']),
+                    'total_pnl': float(row['Total PnL']),
+                    'max_drawdown': float(row['Max Drawdown']),
+                    'profit_factor': float(row['Profit Factor']),
+                    'total_trades': int(row.get('Total Trades', 0)),
+                    'winning_trades': int(row.get('Winning Trades', 0)),
+                    'losing_trades': int(row.get('Losing Trades', 0))
+                }
+                analysis_cache['aggregated_results'].append(result)
+                new_rows += 1
+
+            loaded_files.append(file.filename)
+
+        analysis_cache['files_loaded'].extend(loaded_files)
+        analysis_cache['total_combinations'] = len(analysis_cache['aggregated_results'])
+
+        return jsonify({
+            'success': True,
+            'files_loaded': len(loaded_files),
+            'new_rows': new_rows,
+            'total_combinations': analysis_cache['total_combinations']
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Error uploading results: {str(e)}'}), 500
+
+
+@app.route('/api/analysis/top-combinations', methods=['GET'])
+def get_top_combinations():
+    """Get top 10 combinations for each metric"""
+    try:
+        if not analysis_cache['aggregated_results']:
+            return jsonify({'error': 'No data loaded'}), 400
+
+        results = analysis_cache['aggregated_results']
+        df = pd.DataFrame(results)
+
+        # Handle NaN/inf values
+        df = df.replace([np.inf, -np.inf], np.nan)
+
+        top_10 = {
+            'by_win_rate': [],
+            'by_total_pnl': [],
+            'by_lowest_drawdown': [],
+            'by_profit_factor': []
+        }
+
+        # Top 10 by Win Rate
+        top_win_rate = df.nlargest(10, 'win_rate')[['parameters', 'win_rate', 'total_pnl', 'max_drawdown', 'profit_factor', 'file']].to_dict('records')
+        top_10['by_win_rate'] = top_win_rate
+
+        # Top 10 by Total PnL
+        top_pnl = df.nlargest(10, 'total_pnl')[['parameters', 'win_rate', 'total_pnl', 'max_drawdown', 'profit_factor', 'file']].to_dict('records')
+        top_10['by_total_pnl'] = top_pnl
+
+        # Top 10 by Lowest Drawdown (smallest positive values)
+        df_valid_dd = df[df['max_drawdown'] >= 0].sort_values('max_drawdown').head(10)
+        top_dd = df_valid_dd[['parameters', 'win_rate', 'total_pnl', 'max_drawdown', 'profit_factor', 'file']].to_dict('records')
+        top_10['by_lowest_drawdown'] = top_dd
+
+        # Top 10 by Profit Factor
+        df_valid_pf = df[df['profit_factor'] > 0].nlargest(10, 'profit_factor')[['parameters', 'win_rate', 'total_pnl', 'max_drawdown', 'profit_factor', 'file']].to_dict('records')
+        top_10['by_profit_factor'] = df_valid_pf
+
+        # Clean NaN/inf
+        for key in top_10:
+            for item in top_10[key]:
+                for k, v in item.items():
+                    if isinstance(v, float) and (np.isnan(v) or np.isinf(v)):
+                        item[k] = None
+
+        return jsonify({
+            'success': True,
+            'top_10': top_10,
+            'total_combinations': len(results)
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Error getting top combinations: {str(e)}'}), 500
+
+
+@app.route('/api/analysis/stats', methods=['GET'])
+def get_analysis_stats():
+    """Get stats about aggregated data"""
+    try:
+        return jsonify({
+            'success': True,
+            'total_combinations': analysis_cache['total_combinations'],
+            'files_loaded': len(analysis_cache['files_loaded']),
+            'files': analysis_cache['files_loaded']
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Error getting stats: {str(e)}'}), 500
+
+
+@app.route('/api/analysis/clear-cache', methods=['POST'])
+def clear_analysis_cache():
+    """Clear aggregated results cache"""
+    try:
+        analysis_cache['aggregated_results'] = []
+        analysis_cache['files_loaded'] = []
+        analysis_cache['total_combinations'] = 0
+
+        return jsonify({
+            'success': True,
+            'message': 'Cache cleared'
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Error clearing cache: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
