@@ -304,6 +304,56 @@
     </style>
 </head>
 <body>
+    <style>
+        .nav-header {
+            background: #fff;
+            padding: 15px 20px;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+
+        .nav-tabs-inline {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .nav-tab-link {
+            padding: 10px 20px;
+            border: none;
+            background: #f0f0f0;
+            color: #333;
+            text-decoration: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .nav-tab-link:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .nav-tab-link.active {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+
+    <div class="nav-header">
+        <div class="nav-tabs-inline">
+            <a href="/" class="nav-tab-link">🎯 Reconciliation</a>
+            <a href="/" class="nav-tab-link">🧪 Strategy Tester</a>
+            <a href="/" class="nav-tab-link">⚡ Brute Force</a>
+            <a href="/" class="nav-tab-link">🤖 Unattended Brute Force</a>
+            <span class="nav-tab-link active">📊 Analysis</span>
+        </div>
+    </div>
+
     <div class="container">
         <header>
             <h1>📊 Results Analysis</h1>
