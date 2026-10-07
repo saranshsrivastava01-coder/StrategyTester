@@ -2585,6 +2585,35 @@ def get_analysis_stats():
         return jsonify({'error': f'Error getting stats: {str(e)}'}), 500
 
 
+@app.route('/api/analysis/remove-file/<filename>', methods=['POST'])
+def remove_file_from_analysis(filename):
+    """Remove a specific file from aggregated results"""
+    try:
+        # Filter out results from this file
+        original_count = len(analysis_cache['aggregated_results'])
+        analysis_cache['aggregated_results'] = [
+            r for r in analysis_cache['aggregated_results']
+            if r['file'] != filename
+        ]
+        removed_count = original_count - len(analysis_cache['aggregated_results'])
+
+        # Remove from files list
+        if filename in analysis_cache['files_loaded']:
+            analysis_cache['files_loaded'].remove(filename)
+
+        # Update total
+        analysis_cache['total_combinations'] = len(analysis_cache['aggregated_results'])
+
+        return jsonify({
+            'success': True,
+            'message': f'Removed {removed_count} combinations from {filename}',
+            'total_combinations': analysis_cache['total_combinations']
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Error removing file: {str(e)}'}), 500
+
+
 @app.route('/api/analysis/clear-cache', methods=['POST'])
 def clear_analysis_cache():
     """Clear aggregated results cache"""

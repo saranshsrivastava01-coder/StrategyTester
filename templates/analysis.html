@@ -235,6 +235,30 @@
             border-radius: 12px;
             font-size: 11px;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .file-badge.removable {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .file-badge.removable:hover {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .file-badge-close {
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-block;
+            margin-left: 4px;
+        }
+
+        .file-badge-close:hover {
+            transform: scale(1.2);
         }
 
         .loading {
@@ -490,7 +514,10 @@
 
                     const filesList = document.getElementById('filesList');
                     filesList.innerHTML = data.files.map(f =>
-                        `<span class="file-badge">${f}</span>`
+                        `<span class="file-badge removable" title="Click to remove this file">
+                            ${f}
+                            <span class="file-badge-close" onclick="removeFile('${f}')">×</span>
+                        </span>`
                     ).join('');
 
                     document.getElementById('statsSection').style.display = 'block';
@@ -605,6 +632,35 @@
                 return value.toFixed(2);
             }
             return value;
+        }
+
+        async function removeFile(filename) {
+            if (!confirm(`Remove "${filename}" from analysis?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/analysis/remove-file/${encodeURIComponent(filename)}`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage(`✅ Removed ${filename}`, 'success');
+                    await refreshStats();
+                    if (data.total_combinations > 0) {
+                        await refreshResults();
+                    } else {
+                        document.getElementById('resultsSection').style.display = 'none';
+                        document.getElementById('emptyState').style.display = 'block';
+                    }
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            }
         }
 
         async function clearCache() {
