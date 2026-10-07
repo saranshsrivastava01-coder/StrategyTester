@@ -4655,7 +4655,11 @@
 
         async function refreshAnalysisResults() {
             try {
-                const response = await fetch('/api/analysis/top-combinations');
+                const filterValue = document.getElementById('emaFilter')?.value || 'all';
+                const url = new URL('/api/analysis/top-combinations', window.location.origin);
+                url.searchParams.append('ema_filter', filterValue);
+
+                const response = await fetch(url);
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -4663,11 +4667,24 @@
                     return;
                 }
 
-                const { top_10 } = data;
-                analysisAllResults = { ...top_10 };
-                currentEmaFilter = document.getElementById('emaFilter')?.value || 'all';
+                const { top_10, total_filtered } = data;
 
-                applyEmaFilter(currentEmaFilter);
+                let html = '';
+                html += generateAnalysisTable('🏆 Top 10 by Win Rate (%)', top_10.by_win_rate, ['win_rate', 'total_pnl', 'max_drawdown', 'profit_factor']);
+                html += generateAnalysisTable('💰 Top 10 by Total PnL', top_10.by_total_pnl, ['total_pnl', 'win_rate', 'max_drawdown', 'profit_factor']);
+                html += generateAnalysisTable('📉 Top 10 by Lowest Drawdown', top_10.by_lowest_drawdown, ['max_drawdown', 'win_rate', 'total_pnl', 'profit_factor']);
+                html += generateAnalysisTable('📊 Top 10 by Profit Factor', top_10.by_profit_factor, ['profit_factor', 'win_rate', 'total_pnl', 'max_drawdown']);
+
+                document.getElementById('resultsContainer').innerHTML = html;
+
+                // Update filter stats
+                const statsDiv = document.getElementById('emaFilterStats');
+                if (statsDiv && filterValue !== 'all' && total_filtered >= 0) {
+                    statsDiv.textContent = `From ${total_filtered} filtered combinations`;
+                } else if (statsDiv) {
+                    statsDiv.textContent = '';
+                }
+
                 document.getElementById('resultsSection').style.display = 'block';
             } catch (error) {
                 showAnalysisMessage(`Error loading results: ${error.message}`, 'error');
@@ -4708,34 +4725,7 @@
 
         function applyEmaFilter(filterValue) {
             currentEmaFilter = filterValue;
-
-            const filteredResults = {
-                by_win_rate: filterResultsByEma(analysisAllResults.by_win_rate, filterValue),
-                by_total_pnl: filterResultsByEma(analysisAllResults.by_total_pnl, filterValue),
-                by_lowest_drawdown: filterResultsByEma(analysisAllResults.by_lowest_drawdown, filterValue),
-                by_profit_factor: filterResultsByEma(analysisAllResults.by_profit_factor, filterValue)
-            };
-
-            let html = '';
-            html += generateAnalysisTable('🏆 Top 10 by Win Rate (%)', filteredResults.by_win_rate, ['win_rate', 'total_pnl', 'max_drawdown', 'profit_factor']);
-            html += generateAnalysisTable('💰 Top 10 by Total PnL', filteredResults.by_total_pnl, ['total_pnl', 'win_rate', 'max_drawdown', 'profit_factor']);
-            html += generateAnalysisTable('📉 Top 10 by Lowest Drawdown', filteredResults.by_lowest_drawdown, ['max_drawdown', 'win_rate', 'total_pnl', 'profit_factor']);
-            html += generateAnalysisTable('📊 Top 10 by Profit Factor', filteredResults.by_profit_factor, ['profit_factor', 'win_rate', 'total_pnl', 'max_drawdown']);
-
-            document.getElementById('resultsContainer').innerHTML = html;
-
-            // Update filter stats
-            const totalFiltered = filteredResults.by_win_rate.length + filteredResults.by_total_pnl.length +
-                                 filteredResults.by_lowest_drawdown.length + filteredResults.by_profit_factor.length;
-            const totalOriginal = analysisAllResults.by_win_rate.length + analysisAllResults.by_total_pnl.length +
-                                 analysisAllResults.by_lowest_drawdown.length + analysisAllResults.by_profit_factor.length;
-
-            const statsDiv = document.getElementById('emaFilterStats');
-            if (statsDiv && filterValue !== 'all') {
-                statsDiv.textContent = `Showing ${totalFiltered} of ${totalOriginal} combinations`;
-            } else if (statsDiv) {
-                statsDiv.textContent = '';
-            }
+            refreshAnalysisResults();
         }
 
         function generateAnalysisTable(title, data, metrics) {

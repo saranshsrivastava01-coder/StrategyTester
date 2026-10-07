@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, send_file, Response
 import os
 import json
+import re
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -2536,6 +2537,28 @@ def get_top_combinations():
             return jsonify({'error': 'No data loaded'}), 400
 
         results = analysis_cache['aggregated_results']
+
+        # Apply EMA filter if requested
+        filter_type = request.args.get('ema_filter', 'all')
+        if filter_type != 'all':
+            filtered_results = []
+            for result in results:
+                params_str = result['parameters']
+                # Extract ema9Len (fast) and ema21Len (slow)
+                fast_match = re.search(r'ema9Len=(\d+\.?\d*)', params_str)
+                slow_match = re.search(r'ema21Len=(\d+\.?\d*)', params_str)
+
+                if fast_match and slow_match:
+                    fast_val = float(fast_match.group(1))
+                    slow_val = float(slow_match.group(1))
+
+                    if filter_type == 'fast_less' and fast_val < slow_val:
+                        filtered_results.append(result)
+                    elif filter_type == 'fast_greater' and fast_val > slow_val:
+                        filtered_results.append(result)
+
+            results = filtered_results
+
         df = pd.DataFrame(results)
 
         # Handle NaN/inf values
