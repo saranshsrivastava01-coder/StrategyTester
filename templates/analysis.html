@@ -361,6 +361,72 @@
             font-weight: 600;
         }
 
+        .selected-files {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .selected-files.show {
+            display: block;
+        }
+
+        .selected-files h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .selected-files-list {
+            list-style: none;
+        }
+
+        .selected-files-list li {
+            padding: 8px;
+            background: white;
+            margin-bottom: 6px;
+            border-radius: 3px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #eee;
+        }
+
+        .file-name {
+            color: #333;
+            font-weight: 500;
+            flex: 1;
+            word-break: break-all;
+        }
+
+        .file-size {
+            color: #999;
+            font-size: 12px;
+            margin-left: 10px;
+            white-space: nowrap;
+        }
+
+        .clear-selection {
+            background: #f0f0f0;
+            color: #666;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 3px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 10px;
+        }
+
+        .clear-selection:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+
         @media (max-width: 1200px) {
             .results-container {
                 grid-template-columns: 1fr;
@@ -439,6 +505,12 @@
                 <button class="btn-danger" onclick="clearCache()">🗑️ Clear All Data</button>
             </div>
 
+            <div class="selected-files" id="selectedFilesContainer">
+                <h4>📋 Selected Files to Upload:</h4>
+                <ul class="selected-files-list" id="selectedFilesList"></ul>
+                <button class="clear-selection" onclick="clearFileSelection()">Clear Selection</button>
+            </div>
+
             <div class="progress-container" id="progressContainer">
                 <div class="progress-bar">
                     <div class="progress-fill indeterminate" id="progressFill"></div>
@@ -492,6 +564,36 @@
         const fileInput = document.getElementById('fileInput');
         const messageDiv = document.getElementById('message');
 
+        // Update selected files display
+        function updateSelectedFilesDisplay() {
+            const container = document.getElementById('selectedFilesContainer');
+            const list = document.getElementById('selectedFilesList');
+
+            if (fileInput.files.length === 0) {
+                container.classList.remove('show');
+                return;
+            }
+
+            list.innerHTML = '';
+            let totalSize = 0;
+
+            for (let file of fileInput.files) {
+                totalSize += file.size;
+                const li = document.createElement('li');
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                li.innerHTML = `
+                    <span class="file-name">📄 ${file.name}</span>
+                    <span class="file-size">${sizeMB} MB</span>
+                `;
+                list.appendChild(li);
+            }
+
+            container.classList.add('show');
+        }
+
+        // File input change event
+        fileInput.addEventListener('change', updateSelectedFilesDisplay);
+
         // Drag and drop
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -506,6 +608,7 @@
             e.preventDefault();
             uploadArea.classList.remove('dragover');
             fileInput.files = e.dataTransfer.files;
+            updateSelectedFilesDisplay();
         });
 
         function showMessage(text, type = 'info') {
@@ -514,6 +617,11 @@
             setTimeout(() => {
                 messageDiv.className = 'message';
             }, 5000);
+        }
+
+        function clearFileSelection() {
+            fileInput.value = '';
+            document.getElementById('selectedFilesContainer').classList.remove('show');
         }
 
         async function uploadFiles() {
@@ -559,7 +667,7 @@
                 }
 
                 showMessage(`✅ Loaded ${data.files_loaded} file(s) with ${data.new_rows} combinations`, 'success');
-                fileInput.value = '';
+                clearFileSelection();
 
                 // Refresh stats and results
                 await refreshStats();
