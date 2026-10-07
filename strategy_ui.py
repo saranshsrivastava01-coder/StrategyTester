@@ -2491,18 +2491,25 @@ def upload_results():
             if not all(col in df.columns for col in required_cols):
                 continue
 
-            # Parse and add to cache
+            # Parse and add to cache (with pre-parsed EMA values)
             for _, row in df.iterrows():
+                params_str = row['Parameters']
+                # Pre-parse EMA values to avoid regex on every filter request
+                fast_match = re.search(r'ema9Len=(\d+\.?\d*)', params_str)
+                slow_match = re.search(r'ema21Len=(\d+\.?\d*)', params_str)
+
                 result = {
                     'file': file.filename,
-                    'parameters': row['Parameters'],
+                    'parameters': params_str,
                     'win_rate': float(row['Win Rate (%)']),
                     'total_pnl': float(row['Total PnL']),
                     'max_drawdown': float(row['Max Drawdown']),
                     'profit_factor': float(row['Profit Factor']),
                     'total_trades': int(row.get('Total Trades', 0)),
                     'winning_trades': int(row.get('Winning Trades', 0)),
-                    'losing_trades': int(row.get('Losing Trades', 0))
+                    'losing_trades': int(row.get('Losing Trades', 0)),
+                    'ema_fast': float(fast_match.group(1)) if fast_match else None,
+                    'ema_slow': float(slow_match.group(1)) if slow_match else None
                 }
                 analysis_cache['aggregated_results'].append(result)
                 new_rows += 1
@@ -2536,30 +2543,19 @@ def get_top_combinations():
         if not analysis_cache['aggregated_results']:
             return jsonify({'error': 'No data loaded'}), 400
 
-        results = analysis_cache['aggregated_results']
+        # Create DataFrame once (vectorized operations are faster)
+        df = pd.DataFrame(analysis_cache['aggregated_results'])
 
-        # Apply EMA filter if requested
+        # Apply EMA filter if requested (vectorized pandas filtering - no loop!)
         filter_type = request.args.get('ema_filter', 'all')
         if filter_type != 'all':
-            filtered_results = []
-            for result in results:
-                params_str = result['parameters']
-                # Extract ema9Len (fast) and ema21Len (slow)
-                fast_match = re.search(r'ema9Len=(\d+\.?\d*)', params_str)
-                slow_match = re.search(r'ema21Len=(\d+\.?\d*)', params_str)
+            # Remove rows with missing EMA values
+            df = df.dropna(subset=['ema_fast', 'ema_slow'])
 
-                if fast_match and slow_match:
-                    fast_val = float(fast_match.group(1))
-                    slow_val = float(slow_match.group(1))
-
-                    if filter_type == 'fast_less' and fast_val < slow_val:
-                        filtered_results.append(result)
-                    elif filter_type == 'fast_greater' and fast_val > slow_val:
-                        filtered_results.append(result)
-
-            results = filtered_results
-
-        df = pd.DataFrame(results)
+            if filter_type == 'fast_less':
+                df = df[df['ema_fast'] < df['ema_slow']]
+            elif filter_type == 'fast_greater':
+                df = df[df['ema_fast'] > df['ema_slow']]
 
         # Handle NaN/inf values
         df = df.replace([np.inf, -np.inf], np.nan)
@@ -2598,7 +2594,7 @@ def get_top_combinations():
         return jsonify({
             'success': True,
             'top_10': top_10,
-            'total_combinations': len(results)
+            'total_combinations': len(df)
         })
 
     except Exception as e:
