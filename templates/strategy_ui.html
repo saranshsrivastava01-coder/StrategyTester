@@ -1485,6 +1485,19 @@
 
         <div class="analysis-section" id="resultsSection" style="display: none;">
             <h2>🏆 Top 10 Combinations</h2>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label style="font-weight: 600; color: #333; font-size: 14px;">EMA Filter:</label>
+                    <select id="emaFilter" onchange="applyEmaFilter(this.value)" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; background: white; color: #333; cursor: pointer; font-size: 13px;">
+                        <option value="all">All Combinations</option>
+                        <option value="fast_less">Fast EMA < Slow EMA ✓</option>
+                        <option value="fast_greater">Fast EMA > Slow EMA ✗</option>
+                    </select>
+                </div>
+                <div id="emaFilterStats" style="font-size: 13px; color: #666;"></div>
+            </div>
+
             <div class="results-container" id="resultsContainer">
                 <div class="analysis-loading">
                     <div class="analysis-spinner"></div>
@@ -4471,6 +4484,8 @@
         const analysisFileInput = document.getElementById('analysis-fileInput');
         const analysisMessageDiv = document.getElementById('analysisMessage');
         const analysisUploadArea = document.getElementById('uploadArea');
+        let analysisAllResults = { by_win_rate: [], by_total_pnl: [], by_lowest_drawdown: [], by_profit_factor: [] };
+        let currentEmaFilter = 'all';
 
         function updateAnalysisFilesDisplay() {
             const container = document.getElementById('selectedFilesContainer');
@@ -4649,17 +4664,77 @@
                 }
 
                 const { top_10 } = data;
-                let html = '';
+                analysisAllResults = { ...top_10 };
+                currentEmaFilter = document.getElementById('emaFilter')?.value || 'all';
 
-                html += generateAnalysisTable('🏆 Top 10 by Win Rate (%)', top_10.by_win_rate, ['win_rate', 'total_pnl', 'max_drawdown', 'profit_factor']);
-                html += generateAnalysisTable('💰 Top 10 by Total PnL', top_10.by_total_pnl, ['total_pnl', 'win_rate', 'max_drawdown', 'profit_factor']);
-                html += generateAnalysisTable('📉 Top 10 by Lowest Drawdown', top_10.by_lowest_drawdown, ['max_drawdown', 'win_rate', 'total_pnl', 'profit_factor']);
-                html += generateAnalysisTable('📊 Top 10 by Profit Factor', top_10.by_profit_factor, ['profit_factor', 'win_rate', 'total_pnl', 'max_drawdown']);
-
-                document.getElementById('resultsContainer').innerHTML = html;
+                applyEmaFilter(currentEmaFilter);
                 document.getElementById('resultsSection').style.display = 'block';
             } catch (error) {
                 showAnalysisMessage(`Error loading results: ${error.message}`, 'error');
+            }
+        }
+
+        function parseEmaValues(parametersString) {
+            // Parse "length=1.0 | mult=0.7 | ema9Len=3.0 | ema21Len=2.0"
+            const fastMatch = parametersString.match(/ema9Len=(\d+\.?\d*)/);
+            const slowMatch = parametersString.match(/ema21Len=(\d+\.?\d*)/);
+
+            if (fastMatch && slowMatch) {
+                return {
+                    fast: parseFloat(fastMatch[1]),
+                    slow: parseFloat(slowMatch[1])
+                };
+            }
+            return null;
+        }
+
+        function filterResultsByEma(results, filter) {
+            if (!results || filter === 'all') {
+                return results;
+            }
+
+            return results.filter(row => {
+                const emaValues = parseEmaValues(row.parameters);
+                if (!emaValues) return false;
+
+                if (filter === 'fast_less') {
+                    return emaValues.fast < emaValues.slow;
+                } else if (filter === 'fast_greater') {
+                    return emaValues.fast > emaValues.slow;
+                }
+                return true;
+            });
+        }
+
+        function applyEmaFilter(filterValue) {
+            currentEmaFilter = filterValue;
+
+            const filteredResults = {
+                by_win_rate: filterResultsByEma(analysisAllResults.by_win_rate, filterValue),
+                by_total_pnl: filterResultsByEma(analysisAllResults.by_total_pnl, filterValue),
+                by_lowest_drawdown: filterResultsByEma(analysisAllResults.by_lowest_drawdown, filterValue),
+                by_profit_factor: filterResultsByEma(analysisAllResults.by_profit_factor, filterValue)
+            };
+
+            let html = '';
+            html += generateAnalysisTable('🏆 Top 10 by Win Rate (%)', filteredResults.by_win_rate, ['win_rate', 'total_pnl', 'max_drawdown', 'profit_factor']);
+            html += generateAnalysisTable('💰 Top 10 by Total PnL', filteredResults.by_total_pnl, ['total_pnl', 'win_rate', 'max_drawdown', 'profit_factor']);
+            html += generateAnalysisTable('📉 Top 10 by Lowest Drawdown', filteredResults.by_lowest_drawdown, ['max_drawdown', 'win_rate', 'total_pnl', 'profit_factor']);
+            html += generateAnalysisTable('📊 Top 10 by Profit Factor', filteredResults.by_profit_factor, ['profit_factor', 'win_rate', 'total_pnl', 'max_drawdown']);
+
+            document.getElementById('resultsContainer').innerHTML = html;
+
+            // Update filter stats
+            const totalFiltered = filteredResults.by_win_rate.length + filteredResults.by_total_pnl.length +
+                                 filteredResults.by_lowest_drawdown.length + filteredResults.by_profit_factor.length;
+            const totalOriginal = analysisAllResults.by_win_rate.length + analysisAllResults.by_total_pnl.length +
+                                 analysisAllResults.by_lowest_drawdown.length + analysisAllResults.by_profit_factor.length;
+
+            const statsDiv = document.getElementById('emaFilterStats');
+            if (statsDiv && filterValue !== 'all') {
+                statsDiv.textContent = `Showing ${totalFiltered} of ${totalOriginal} combinations`;
+            } else if (statsDiv) {
+                statsDiv.textContent = '';
             }
         }
 
